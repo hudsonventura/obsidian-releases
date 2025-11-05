@@ -15,5 +15,6 @@ export interface KanbanTask {
 export interface KanbanData {
 	tasks?: KanbanTask[];
 	columns?: string[];
+	collapsedColumns?: string[]; // Array of column names that are collapsed
 }
 

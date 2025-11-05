@@ -177,7 +177,64 @@ export function renderKanban(
 		taskEl.setAttr("data-status", status);
 		taskEl.classList.add("kanban-task-draggable");
 		
-		const taskContent = taskEl.createDiv("kanban-task-content");
+		// Task header with content and copy button
+		const taskHeader = taskEl.createDiv("kanban-task-header");
+		const taskContent = taskHeader.createDiv("kanban-task-content");
+		
+		// Copy button
+		const copyBtn = taskHeader.createEl("button", {
+			cls: "kanban-task-copy-btn"
+		});
+		copyBtn.setAttribute("aria-label", "Copy task title");
+		
+		// Copy icon
+		const copyIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		copyIcon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+		copyIcon.setAttribute("width", "14");
+		copyIcon.setAttribute("height", "14");
+		copyIcon.setAttribute("viewBox", "0 0 24 24");
+		copyIcon.setAttribute("fill", "none");
+		copyIcon.setAttribute("stroke", "currentColor");
+		copyIcon.setAttribute("stroke-width", "2");
+		copyIcon.setAttribute("stroke-linecap", "round");
+		copyIcon.setAttribute("stroke-linejoin", "round");
+		copyIcon.innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>';
+		copyBtn.appendChild(copyIcon);
+		
+		// Copy button click handler
+		copyBtn.addEventListener("click", async (e) => {
+			e.stopPropagation();
+			
+			// Convert markdown to plain text
+			const plainText = task.task
+				// Remove markdown links [text](url) -> text
+				.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+				// Remove bold **text** -> text
+				.replace(/\*\*([^*]+)\*\*/g, '$1')
+				// Remove italic *text* -> text
+				.replace(/\*([^*]+)\*/g, '$1')
+				// Remove inline code `code` -> code
+				.replace(/`([^`]+)`/g, '$1')
+				// Remove strikethrough ~~text~~ -> text
+				.replace(/~~([^~]+)~~/g, '$1');
+			
+			try {
+				await navigator.clipboard.writeText(plainText);
+				
+				// Visual feedback - change icon temporarily
+				copyIcon.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>'; // Check mark
+				copyBtn.addClass("kanban-task-copy-btn-success");
+				
+				setTimeout(() => {
+					copyIcon.innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>';
+					copyBtn.removeClass("kanban-task-copy-btn-success");
+				}, 1500);
+				
+				console.log("Kanban: Copied task title:", plainText);
+			} catch (err) {
+				console.error("Kanban: Failed to copy task title:", err);
+			}
+		});
 		
 		// Render task name as markdown to support links
 		MarkdownRenderer.render(
@@ -197,8 +254,11 @@ export function renderKanban(
 			}
 		});
 		
+		// Target time and timer controls row
+		const targetTimeRow = taskEl.createDiv("kanban-task-target-time-row");
+		
 		// Target time display
-		const targetTimeEl = taskEl.createDiv("kanban-task-target-time");
+		const targetTimeEl = targetTimeRow.createDiv("kanban-task-target-time");
 		const clockIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 		clockIcon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
 		clockIcon.setAttribute("width", "14");
@@ -220,6 +280,23 @@ export function renderKanban(
 		if (!task.targetTime) {
 			targetTimeText.addClass("kanban-target-time-empty");
 		}
+		
+		// Timer buttons on the same row
+		const timerButtons = targetTimeRow.createDiv("kanban-timer-buttons");
+		
+		// Start button
+		const startButton = timerButtons.createEl("button", {
+			cls: "kanban-timer-button kanban-timer-start",
+			attr: { "aria-label": "Start timer" }
+		});
+		startButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+		
+		// Stop button
+		const stopButton = timerButtons.createEl("button", {
+			cls: "kanban-timer-button kanban-timer-stop",
+			attr: { "aria-label": "Stop timer" }
+		});
+		stopButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>`;
 		
 		// Double-click to edit target time
 		let isEditingTargetTime = false;
@@ -323,16 +400,6 @@ export function renderKanban(
 		let progressFill: HTMLElement | undefined;
 		let progressText: HTMLElement | undefined;
 		
-		if (task.targetTime && parseTargetTime(task.targetTime) > 0) {
-			progressContainer = taskEl.createDiv("kanban-progress-container");
-			const progressBar = progressContainer.createDiv("kanban-progress-bar");
-			progressFill = progressBar.createDiv("kanban-progress-fill");
-			progressText = progressContainer.createDiv("kanban-progress-text");
-			
-			// Initial update
-			updateProgressBar();
-		}
-		
 		function updateProgressBar() {
 			if (!progressFill || !progressText || !task.targetTime) return;
 			
@@ -388,46 +455,9 @@ export function renderKanban(
 			}
 		}
 		
-		// Timer section
-		const timerSection = taskEl.createDiv("kanban-task-timer");
-		const timerDisplay = timerSection.createSpan({ cls: "kanban-timer-display" });
-		
-		// Timer buttons container
-		const timerButtons = timerSection.createDiv("kanban-timer-buttons");
-		
-		// Start button
-		const startButton = timerButtons.createEl("button", {
-			cls: "kanban-timer-button kanban-timer-start",
-			attr: { "aria-label": "Start timer" }
-		});
-		startButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
-		
-		// Stop button
-		const stopButton = timerButtons.createEl("button", {
-			cls: "kanban-timer-button kanban-timer-stop",
-			attr: { "aria-label": "Stop timer" }
-		});
-		stopButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>`;
-		
-		// Update timer display
+		// Update timer display and button states
 		function updateTimerDisplay() {
-			const duration = getTaskTimerDuration(task);
 			const isRunning = isTaskTimerRunning(task);
-			
-			if (duration > 0) {
-				timerDisplay.setText(formatTimerDuration(duration));
-				timerSection.style.display = "flex";
-				if (isRunning) {
-					timerDisplay.addClass("kanban-timer-running");
-					taskEl.addClass("kanban-task-timer-running");
-				} else {
-					timerDisplay.removeClass("kanban-timer-running");
-					taskEl.removeClass("kanban-task-timer-running");
-				}
-			} else {
-				timerDisplay.setText("0s");
-				timerSection.style.display = "flex";
-			}
 			
 			// Update button states
 			if (isRunning) {
@@ -435,11 +465,13 @@ export function renderKanban(
 				stopButton.disabled = false;
 				startButton.addClass("kanban-timer-button-disabled");
 				stopButton.removeClass("kanban-timer-button-disabled");
+				taskEl.addClass("kanban-task-timer-running");
 			} else {
 				startButton.disabled = false;
 				stopButton.disabled = true;
 				startButton.removeClass("kanban-timer-button-disabled");
 				stopButton.addClass("kanban-timer-button-disabled");
+				taskEl.removeClass("kanban-task-timer-running");
 			}
 			
 			// Update progress bar if it exists
@@ -484,6 +516,17 @@ export function renderKanban(
 		
 		// Store update function for interval
 		(taskEl as any).updateTimerDisplay = updateTimerDisplay;
+		
+		// Progress bar at the bottom (only if target time exists)
+		if (task.targetTime && parseTargetTime(task.targetTime) > 0) {
+			progressContainer = taskEl.createDiv("kanban-progress-container");
+			const progressBar = progressContainer.createDiv("kanban-progress-bar");
+			progressFill = progressBar.createDiv("kanban-progress-fill");
+			progressText = progressContainer.createDiv("kanban-progress-text");
+			
+			// Initial update
+			updateProgressBar();
+		}
 		
         // Double-click to edit task name
         let isEditing = false;
@@ -711,8 +754,44 @@ export function renderKanban(
 			console.log("Kanban: Updated task:", updatedTaskText);
 		}
 		
-		await updateKanbanInFile(plugin.app, ctx, updatedTaskText || "", "todo" as KanbanStatus, originalSource, { tasks: allTasks, columns: data.columns }).catch(err => {
+		await updateKanbanInFile(plugin.app, ctx, updatedTaskText || "", "todo" as KanbanStatus, originalSource, { 
+			tasks: allTasks, 
+			columns: data.columns,
+			collapsedColumns: data.collapsedColumns
+		}).catch(err => {
 			console.error("Error saving tasks to file:", err);
+		});
+	}
+	
+	async function saveCollapsedState() {
+		const allTasks: KanbanTask[] = [];
+		taskElements.forEach((info) => {
+			const taskData: KanbanTask = { 
+				task: info.task.task, 
+				status: info.status
+			};
+			
+			// Include target time if it exists
+			if (info.task.targetTime) {
+				taskData.targetTime = info.task.targetTime;
+			}
+			
+			// Include timer entries if they exist
+			if (info.task.timerEntries && info.task.timerEntries.length > 0) {
+				taskData.timerEntries = info.task.timerEntries;
+			}
+			
+			allTasks.push(taskData);
+		});
+		
+		console.log("Kanban: Saving collapsed state:", data.collapsedColumns);
+		
+		await updateKanbanInFile(plugin.app, ctx, "", "todo" as KanbanStatus, originalSource, { 
+			tasks: allTasks, 
+			columns: data.columns,
+			collapsedColumns: data.collapsedColumns
+		}).catch(err => {
+			console.error("Error saving collapsed state to file:", err);
 		});
 	}
 	
@@ -807,11 +886,75 @@ export function renderKanban(
 		
 		// Column header
 		const headerEl = columnEl.createDiv("kanban-column-header");
+		
+		// Collapse button
+		const collapseBtn = headerEl.createEl("button", {
+			cls: "kanban-column-collapse-btn"
+		});
+		collapseBtn.setAttribute("aria-label", "Toggle column");
+		
+		// Chevron icon
+		const chevronIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		chevronIcon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+		chevronIcon.setAttribute("width", "16");
+		chevronIcon.setAttribute("height", "16");
+		chevronIcon.setAttribute("viewBox", "0 0 24 24");
+		chevronIcon.setAttribute("fill", "none");
+		chevronIcon.setAttribute("stroke", "currentColor");
+		chevronIcon.setAttribute("stroke-width", "2");
+		chevronIcon.setAttribute("stroke-linecap", "round");
+		chevronIcon.setAttribute("stroke-linejoin", "round");
+		chevronIcon.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
+		collapseBtn.appendChild(chevronIcon);
+		
 		const headerTitle = headerEl.createEl("h3");
 		headerTitle.setText(displayName);
 		
 		// Column tasks container
 		const tasksEl = columnEl.createDiv("kanban-column-tasks");
+		
+		// Check if this column is collapsed in the saved state
+		const collapsedColumns = data.collapsedColumns || [];
+		let isCollapsed = collapsedColumns.includes(status);
+		
+		// Apply initial collapsed state
+		if (isCollapsed) {
+			columnEl.addClass("kanban-column-collapsed");
+			tasksEl.style.display = "none";
+			chevronIcon.innerHTML = '<polyline points="9 18 15 12 9 6"></polyline>';
+		}
+		
+		// Collapse button click handler
+		collapseBtn.addEventListener("click", async (e) => {
+			e.stopPropagation();
+			isCollapsed = !isCollapsed;
+			
+			if (isCollapsed) {
+				columnEl.addClass("kanban-column-collapsed");
+				tasksEl.style.display = "none";
+				chevronIcon.innerHTML = '<polyline points="9 18 15 12 9 6"></polyline>';
+				
+				// Add to collapsed columns
+				if (!data.collapsedColumns) {
+					data.collapsedColumns = [];
+				}
+				if (!data.collapsedColumns.includes(status)) {
+					data.collapsedColumns.push(status);
+				}
+			} else {
+				columnEl.removeClass("kanban-column-collapsed");
+				tasksEl.style.display = "flex";
+				chevronIcon.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
+				
+				// Remove from collapsed columns
+				if (data.collapsedColumns) {
+					data.collapsedColumns = data.collapsedColumns.filter(col => col !== status);
+				}
+			}
+			
+			// Save the collapsed state to file
+			await saveCollapsedState();
+		});
 		const tasks = tasksByStatus.get(status) || [];
 		
 		// Create tasks
@@ -1224,14 +1367,15 @@ async function updateKanbanInFile(
 			// Generate new JSON string
 			let newBlockContent: string;
 			
-			// If we have custom columns, always use object format
+			// If we have custom columns or collapsed columns, always use object format
 			const hasCustomColumns = updatedData.columns && updatedData.columns.length > 0;
+			const hasCollapsedColumns = updatedData.collapsedColumns && updatedData.collapsedColumns.length > 0;
 			
-			if (normalizedBlock.startsWith("[") && !hasCustomColumns) {
-				// Original was array format and no custom columns - keep array format
+			if (normalizedBlock.startsWith("[") && !hasCustomColumns && !hasCollapsedColumns) {
+				// Original was array format and no custom columns or collapsed state - keep array format
 				newBlockContent = JSON.stringify(updatedData.tasks || [], null, 2);
 			} else {
-				// Use object format if: original was object, or we have custom columns
+				// Use object format if: original was object, or we have custom columns, or we have collapsed columns
 				newBlockContent = JSON.stringify(updatedData, null, 2);
 			}
 			
