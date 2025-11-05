@@ -25,7 +25,8 @@ function normalizeStatus(status: string | undefined): KanbanStatus {
 		"complete": "done",
 	};
 	
-	return statusMap[normalized] || (VALID_STATUSES.includes(normalized as KanbanStatus) ? normalized as KanbanStatus : DEFAULT_STATUS);
+	// Return mapped status if found, otherwise return the status as-is (allowing custom statuses)
+	return statusMap[normalized] || (normalized as KanbanStatus);
 }
 
 export function registerKanbanProcessor(plugin: Plugin) {

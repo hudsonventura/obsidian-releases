@@ -966,12 +966,26 @@ export function renderKanban(
 		const headerTitle = headerEl.createEl("h3");
 		headerTitle.setText(displayName);
 		
+		// Task count badge
+		const taskCountBadge = headerEl.createEl("span", {
+			cls: "kanban-column-count"
+		});
+		
 		// Column tasks container
 		const tasksEl = columnEl.createDiv("kanban-column-tasks");
 		
 		// Check if this column is collapsed in the saved state
 		const collapsedColumns = data.collapsedColumns || [];
 		let isCollapsed = collapsedColumns.includes(status);
+		
+		// Function to update task count
+		const updateTaskCount = () => {
+			const tasks = tasksByStatus.get(status) || [];
+			taskCountBadge.setText(`${tasks.length}`);
+		};
+		
+		// Set initial count
+		updateTaskCount();
 		
 		// Apply initial collapsed state
 		if (isCollapsed) {
