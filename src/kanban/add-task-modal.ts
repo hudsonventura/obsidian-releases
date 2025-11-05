@@ -96,8 +96,8 @@ export class AddTaskModal extends Modal {
 		}
 
 		const newTask: KanbanTask = {
-			task: trimmedTaskName,
-			status: "todo"
+			task: trimmedTaskName
+			// Status will be set by the renderer based on available columns
 		};
 
 		// Add target time if provided

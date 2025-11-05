@@ -1,4 +1,4 @@
-import { Plugin, MarkdownPostProcessorContext, App, TFile, moment, Menu } from "obsidian";
+import { Plugin, MarkdownPostProcessorContext, App, TFile, moment, Menu, MarkdownRenderer, Component } from "obsidian";
 import { KanbanTask, KanbanData, KanbanStatus, TimerEntry } from "../types";
 import { TimerEntriesModal } from "./timer-modal";
 import { AddTaskModal } from "./add-task-modal";
@@ -118,6 +118,10 @@ export function renderKanban(
 ) {
 	console.log("Kanban Plugin: renderKanban called", { containerEl, data });
 	
+	// Create a component for markdown rendering
+	const component = new Component();
+	component.load();
+	
 	// Clear the container
 	containerEl.empty();
 	containerEl.classList.add("kanban-container");
@@ -174,7 +178,24 @@ export function renderKanban(
 		taskEl.classList.add("kanban-task-draggable");
 		
 		const taskContent = taskEl.createDiv("kanban-task-content");
-		taskContent.setText(task.task);
+		
+		// Render task name as markdown to support links
+		MarkdownRenderer.render(
+			plugin.app,
+			task.task,
+			taskContent,
+			ctx.sourcePath,
+			component
+		).then(() => {
+			// Remove wrapping paragraph if present
+			const paragraph = taskContent.querySelector("p");
+			if (paragraph) {
+				while (paragraph.firstChild) {
+					taskContent.appendChild(paragraph.firstChild);
+				}
+				paragraph.remove();
+			}
+		});
 		
 		// Target time display
 		const targetTimeEl = taskEl.createDiv("kanban-task-target-time");
@@ -282,7 +303,7 @@ export function renderKanban(
 					await saveEdit();
 				} else if (e.key === "Escape") {
 					e.preventDefault();
-					cancelEdit();
+					await cancelEdit();
 				}
 			});
 			
@@ -464,109 +485,137 @@ export function renderKanban(
 		// Store update function for interval
 		(taskEl as any).updateTimerDisplay = updateTimerDisplay;
 		
-		// Double-click to edit task name
-		let isEditing = false;
-		taskContent.addEventListener("dblclick", (e) => {
-			e.stopPropagation();
-			if (isEditing) return;
-			
-			isEditing = true;
-			const currentText = task.task;
-			
-			// Create input field
-			const input = taskContent.createEl("input", {
-				type: "text",
-				cls: "kanban-task-edit-input",
-				value: currentText
-			});
-			
-			// Clear the content and add input
-			taskContent.empty();
-			taskContent.appendChild(input);
-			
-			// Focus and select text
-			input.focus();
-			input.select();
-			
-			// Disable dragging while editing
-			taskEl.setAttr("draggable", "false");
-			taskEl.classList.remove("kanban-task-draggable");
-			
-			// Function to save changes
-			const saveEdit = async () => {
-				if (!isEditing) return;
-				
-				const newText = input.value.trim();
-				
-				// Restore content
-				taskContent.empty();
-				
-				if (newText && newText !== currentText) {
-					// Check if task with same name already exists
-					const taskExists = Array.from(taskElements.values()).some(
-						info => info.task !== task && info.task.task === newText
-					);
-					
-					if (taskExists) {
-						// Task name already exists, revert
-						taskContent.setText(currentText);
-						console.warn("Kanban: Task with that name already exists");
-					} else {
-						// Update task name
-						const oldTaskName = task.task;
-						task.task = newText;
-						taskContent.setText(newText);
-						taskEl.setAttr("data-task", newText);
-						
-						// Save to file
-						await saveTasksToFile(oldTaskName);
-						console.log("Kanban: Task renamed from", oldTaskName, "to", newText);
-					}
-				} else {
-					// No change or empty, revert
-					taskContent.setText(currentText);
-				}
-				
-				// Re-enable dragging
-				taskEl.setAttr("draggable", "true");
-				taskEl.classList.add("kanban-task-draggable");
-				isEditing = false;
-			};
-			
-			// Function to cancel edit
-			const cancelEdit = () => {
-				if (!isEditing) return;
-				
-				taskContent.empty();
-				taskContent.setText(currentText);
-				
-				// Re-enable dragging
-				taskEl.setAttr("draggable", "true");
-				taskEl.classList.add("kanban-task-draggable");
-				isEditing = false;
-			};
-			
-			// Save on Enter
-			input.addEventListener("keydown", async (e: KeyboardEvent) => {
-				if (e.key === "Enter") {
-					e.preventDefault();
-					await saveEdit();
-				} else if (e.key === "Escape") {
-					e.preventDefault();
-					cancelEdit();
-				}
-			});
-			
-			// Save on blur (click outside)
-			input.addEventListener("blur", async () => {
-				// Small delay to allow other click events to process
-				setTimeout(async () => {
-					if (isEditing) {
-						await saveEdit();
-					}
-				}, 100);
-			});
-		});
+        // Double-click to edit task name
+        let isEditing = false;
+        taskContent.addEventListener("dblclick", (e) => {
+            e.stopPropagation();
+            if (isEditing) return;
+            
+            isEditing = true;
+            const currentText = task.task;
+            
+            // Create input for editing
+            const input = taskContent.createEl("input", {
+                type: "text",
+                cls: "kanban-task-edit-input",
+                value: currentText
+            });
+            
+            // Clear the content and add input
+            taskContent.empty();
+            taskContent.appendChild(input);
+            
+            // Focus and select text
+            input.focus();
+            input.select();
+            
+            // Disable dragging while editing
+            taskEl.setAttr("draggable", "false");
+            taskEl.classList.remove("kanban-task-draggable");
+            
+            // Function to save changes
+            const saveEdit = async () => {
+                if (!isEditing) return;
+                
+                const newText = input.value.trim();
+                
+                // Restore content
+                taskContent.empty();
+                
+                if (newText && newText !== currentText) {
+                    // Check if task with same name already exists
+                    const taskExists = Array.from(taskElements.values()).some(
+                        info => info.task !== task && info.task.task === newText
+                    );
+                    
+                    if (taskExists) {
+                        // Task name already exists, revert
+                        await MarkdownRenderer.render(plugin.app, currentText, taskContent, ctx.sourcePath, component);
+                        const paragraph = taskContent.querySelector("p");
+                        if (paragraph) {
+                            while (paragraph.firstChild) {
+                                taskContent.appendChild(paragraph.firstChild);
+                            }
+                            paragraph.remove();
+                        }
+                        console.warn("Kanban: Task with that name already exists");
+                    } else {
+                        // Update task name
+                        const oldTaskName = task.task;
+                        task.task = newText;
+                        await MarkdownRenderer.render(plugin.app, newText, taskContent, ctx.sourcePath, component);
+                        const paragraph = taskContent.querySelector("p");
+                        if (paragraph) {
+                            while (paragraph.firstChild) {
+                                taskContent.appendChild(paragraph.firstChild);
+                            }
+                            paragraph.remove();
+                        }
+                        taskEl.setAttr("data-task", newText);
+                        
+                        // Save to file
+                        await saveTasksToFile(oldTaskName);
+                        console.log("Kanban: Task renamed from", oldTaskName, "to", newText);
+                    }
+                } else {
+                    // No change or empty, revert
+                    await MarkdownRenderer.render(plugin.app, currentText, taskContent, ctx.sourcePath, component);
+                    const paragraph = taskContent.querySelector("p");
+                    if (paragraph) {
+                        while (paragraph.firstChild) {
+                            taskContent.appendChild(paragraph.firstChild);
+                        }
+                        paragraph.remove();
+                    }
+                }
+                
+                // Re-enable dragging
+                taskEl.setAttr("draggable", "true");
+                taskEl.classList.add("kanban-task-draggable");
+                isEditing = false;
+            };
+            
+            // Function to cancel edit
+            const cancelEdit = async () => {
+                if (!isEditing) return;
+                
+                taskContent.empty();
+                await MarkdownRenderer.render(plugin.app, currentText, taskContent, ctx.sourcePath, component);
+                const paragraph = taskContent.querySelector("p");
+                if (paragraph) {
+                    while (paragraph.firstChild) {
+                        taskContent.appendChild(paragraph.firstChild);
+                    }
+                    paragraph.remove();
+                }
+                
+                // Re-enable dragging
+                taskEl.setAttr("draggable", "true");
+                taskEl.classList.add("kanban-task-draggable");
+                isEditing = false;
+            };
+            
+            // Handle keyboard shortcuts
+            input.addEventListener("keydown", async (e: KeyboardEvent) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    await saveEdit();
+                } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    await cancelEdit();
+                }
+            });
+            
+            // Save on blur (click outside)
+            input.addEventListener("blur", async () => {
+                // Small delay to allow other click events to process
+                setTimeout(async () => {
+                    if (isEditing) {
+                        await saveEdit();
+                    }
+                }, 100);
+            });
+        });
 		
 		// Right-click context menu
 		taskEl.addEventListener("contextmenu", (e) => {
@@ -673,20 +722,21 @@ export function renderKanban(
 			if (!newStatus) return; // User cancelled
 			
 			// Add the new status to the columns array
-			if (!data.columns) {
-				data.columns = [...DEFAULT_COLUMNS];
+			if (!data.columns || data.columns.length === 0) {
+				// Initialize with current columns (including any existing ones)
+				data.columns = [...statusColumns];
 			}
+			
+			// Add the new status
 			data.columns.push(newStatus);
+			
+			console.log("Kanban: Adding new status column:", newStatus);
+			console.log("Kanban: Current columns:", data.columns);
 			
 			// Save to file to persist the new column
 			await updateKanbanInFile(plugin.app, ctx, "", "todo", originalSource, data).catch(err => {
 				console.error("Error saving new status column:", err);
 			});
-			
-			// Re-render the entire board to show the new column
-			// We need to trigger a refresh - the easiest way is to update the file
-			// which will cause Obsidian to re-render the block
-			console.log("Kanban: Added new status column:", newStatus);
 		});
 		modal.open();
 	});
@@ -706,21 +756,33 @@ export function renderKanban(
 				return;
 			}
 			
-			// Find the todo column
-			const todoColumn = columnElements.get("todo");
-			if (!todoColumn) {
-				console.error("Kanban: Could not find todo column");
+			// Find the first column (prefer "todo" if it exists, otherwise use first available)
+			const firstStatus = statusColumns[0];
+			let targetColumn = columnElements.get("todo");
+			let targetStatus: KanbanStatus = "todo";
+			
+			if (!targetColumn && firstStatus) {
+				// "todo" doesn't exist, use first column
+				targetColumn = columnElements.get(firstStatus);
+				targetStatus = firstStatus;
+			}
+			
+			if (!targetColumn) {
+				console.error("Kanban: Could not find any column to add task");
 				return;
 			}
 			
-			const tasksContainer = todoColumn.querySelector(".kanban-column-tasks") as HTMLElement;
+			const tasksContainer = targetColumn.querySelector(".kanban-column-tasks") as HTMLElement;
 			if (!tasksContainer) {
-				console.error("Kanban: Could not find tasks container in todo column");
+				console.error("Kanban: Could not find tasks container in column");
 				return;
 			}
+			
+			// Set the task status to the target column
+			newTask.status = targetStatus;
 			
 			// Create and add the task element
-			const taskEl = createTaskElement(newTask, "todo", tasksContainer);
+			const taskEl = createTaskElement(newTask, targetStatus, tasksContainer);
 			
 			// Verify the task was added to the map
 			if (!taskElements.has(taskEl)) {
@@ -731,7 +793,7 @@ export function renderKanban(
 			// Update the file
 			await saveTasksToFile();
 			
-			console.log("Kanban: Created new task:", newTask.task, "with target time:", newTask.targetTime);
+			console.log("Kanban: Created new task:", newTask.task, "in column:", targetStatus);
 		});
 		modal.open();
 	});
@@ -1159,13 +1221,17 @@ async function updateKanbanInFile(
 			// Use the updated data from currentData (which already has the updated status)
 			const updatedData = currentData;
 			
-			// Generate new JSON string - preserve original format
+			// Generate new JSON string
 			let newBlockContent: string;
-			if (normalizedBlock.startsWith("[")) {
-				// Original was array format
+			
+			// If we have custom columns, always use object format
+			const hasCustomColumns = updatedData.columns && updatedData.columns.length > 0;
+			
+			if (normalizedBlock.startsWith("[") && !hasCustomColumns) {
+				// Original was array format and no custom columns - keep array format
 				newBlockContent = JSON.stringify(updatedData.tasks || [], null, 2);
 			} else {
-				// Original was object format - preserve columns if they exist
+				// Use object format if: original was object, or we have custom columns
 				newBlockContent = JSON.stringify(updatedData, null, 2);
 			}
 			
