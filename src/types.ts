@@ -11,6 +11,7 @@ export interface KanbanTask {
 	timerEntries?: TimerEntry[];
 	targetTime?: string; // Due time for the task (e.g., "2h", "1d", "2025-12-31")
 	tags?: string[]; // Tags for the task (e.g., ["#Test", "#John_Master"])
+	dueDate?: string; // Due date/time for the task (ISO string format)
 }
 
 export interface KanbanData {

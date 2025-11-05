@@ -282,6 +282,140 @@ export function renderKanban(
 			targetTimeText.addClass("kanban-target-time-empty");
 		}
 		
+		// Due date display on the same row
+		const dueDateEl = targetTimeRow.createDiv("kanban-task-due-date");
+		
+		const calendarIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		calendarIcon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+		calendarIcon.setAttribute("width", "12");
+		calendarIcon.setAttribute("height", "12");
+		calendarIcon.setAttribute("viewBox", "0 0 24 24");
+		calendarIcon.setAttribute("fill", "none");
+		calendarIcon.setAttribute("stroke", "currentColor");
+		calendarIcon.setAttribute("stroke-width", "2");
+		calendarIcon.setAttribute("stroke-linecap", "round");
+		calendarIcon.setAttribute("stroke-linejoin", "round");
+		calendarIcon.innerHTML = '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>';
+		dueDateEl.appendChild(calendarIcon);
+		
+		const dueDateText = dueDateEl.createSpan({ cls: "kanban-due-date-text" });
+		
+		function updateDueDateDisplay() {
+			if (task.dueDate) {
+				const dueDate = moment(task.dueDate);
+				const now = moment();
+				
+				// Format the date/time
+				const formattedDate = dueDate.format("MMM D, YYYY HH:mm");
+				dueDateText.setText(formattedDate);
+				dueDateText.removeClass("kanban-due-date-empty", "kanban-due-date-overdue", "kanban-due-date-soon", "kanban-due-date-future");
+				
+				// Add class based on due date status
+				if (dueDate.isBefore(now)) {
+					dueDateText.addClass("kanban-due-date-overdue");
+				} else if (dueDate.diff(now, "hours") <= 24) {
+					dueDateText.addClass("kanban-due-date-soon");
+				} else {
+					dueDateText.addClass("kanban-due-date-future");
+				}
+			} else {
+				dueDateText.setText("No due date");
+				dueDateText.addClass("kanban-due-date-empty");
+				dueDateText.removeClass("kanban-due-date-overdue", "kanban-due-date-soon", "kanban-due-date-future");
+			}
+		}
+		
+		// Initial due date display
+		updateDueDateDisplay();
+		
+		// Double-click to edit due date
+		let isEditingDueDate = false;
+		dueDateEl.addEventListener("dblclick", (e) => {
+			e.stopPropagation();
+			if (isEditingDueDate) return;
+			
+			isEditingDueDate = true;
+			const currentDueDate = task.dueDate || "";
+			
+			// Create input field for datetime
+			const inputValue = currentDueDate ? moment(currentDueDate).format("YYYY-MM-DDTHH:mm") : "";
+			const input = dueDateText.createEl("input", {
+				type: "datetime-local",
+				cls: "kanban-task-edit-input kanban-due-date-edit-input",
+				value: inputValue
+			});
+			
+			// Clear the content and add input
+			dueDateText.empty();
+			dueDateText.appendChild(input);
+			
+			// Focus
+			input.focus();
+			
+			// Disable dragging while editing
+			taskEl.setAttr("draggable", "false");
+			taskEl.classList.remove("kanban-task-draggable");
+			
+			// Function to save changes
+			const saveEdit = async () => {
+				if (!isEditingDueDate) return;
+				
+				const newDueDate = input.value.trim();
+				
+				// Update task
+				if (newDueDate) {
+					task.dueDate = moment(newDueDate).toISOString();
+				} else {
+					task.dueDate = undefined;
+				}
+				
+				// Update display
+				updateDueDateDisplay();
+				
+				// Re-enable dragging
+				taskEl.setAttr("draggable", "true");
+				taskEl.classList.add("kanban-task-draggable");
+				isEditingDueDate = false;
+				
+				// Save to file
+				await saveTasksToFile(task.task);
+				console.log("Kanban: Due date updated:", task.dueDate);
+			};
+			
+			// Function to cancel edit
+			const cancelEdit = () => {
+				if (!isEditingDueDate) return;
+				
+				updateDueDateDisplay();
+				
+				// Re-enable dragging
+				taskEl.setAttr("draggable", "true");
+				taskEl.classList.add("kanban-task-draggable");
+				isEditingDueDate = false;
+			};
+			
+			// Handle keyboard shortcuts
+			input.addEventListener("keydown", async (e: KeyboardEvent) => {
+				if (e.key === "Enter") {
+					e.preventDefault();
+					await saveEdit();
+				} else if (e.key === "Escape") {
+					e.preventDefault();
+					cancelEdit();
+				}
+			});
+			
+			// Save on blur (click outside)
+			input.addEventListener("blur", async () => {
+				// Small delay to allow other click events to process
+				setTimeout(async () => {
+					if (isEditingDueDate) {
+						await saveEdit();
+					}
+				}, 100);
+			});
+		});
+		
 		// Timer buttons on the same row
 		const timerButtons = targetTimeRow.createDiv("kanban-timer-buttons");
 		
@@ -794,6 +928,11 @@ export function renderKanban(
 			// Include tags if they exist
 			if (info.task.tags && info.task.tags.length > 0) {
 				taskData.tags = info.task.tags;
+			}
+			
+			// Include due date if it exists
+			if (info.task.dueDate) {
+				taskData.dueDate = info.task.dueDate;
 			}
 			
 			allTasks.push(taskData);
