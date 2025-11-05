@@ -8,24 +8,41 @@
 	margin-bottom: 1rem;
 	display: flex;
 	justify-content: flex-end;
+	gap: 0.5rem;
 }
 
+.kanban-add-status-button,
 .kanban-add-task-button {
-	background-color: var(--interactive-accent);
-	color: var(--text-on-accent);
 	border: none;
 	border-radius: 4px;
 	padding: 0.5rem 1rem;
 	font-size: 0.9rem;
 	font-weight: 500;
 	cursor: pointer;
-	transition: background-color 0.2s ease;
+	transition: all 0.2s ease;
+}
+
+.kanban-add-status-button {
+	background-color: var(--background-modifier-border);
+	color: var(--text-normal);
+	border: 1px solid var(--background-modifier-border);
+}
+
+.kanban-add-status-button:hover {
+	background-color: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+}
+
+.kanban-add-task-button {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
 }
 
 .kanban-add-task-button:hover {
 	background-color: var(--interactive-accent-hover);
 }
 
+.kanban-add-status-button:active,
 .kanban-add-task-button:active {
 	transform: scale(0.98);
 }
@@ -159,6 +176,60 @@
 	line-height: 1.4;
 }
 
+.kanban-task-edit-input {
+	width: 100%;
+	background-color: var(--background-primary);
+	border: 2px solid var(--interactive-accent);
+	border-radius: 4px;
+	padding: 0.25rem 0.5rem;
+	font-size: inherit;
+	font-family: inherit;
+	color: var(--text-normal);
+	outline: none;
+	transition: border-color 0.2s ease;
+}
+
+.kanban-task-target-time {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	margin-top: 0.5rem;
+	color: var(--text-muted);
+	font-size: 0.85rem;
+	cursor: pointer;
+	padding: 0.25rem;
+	margin-left: -0.25rem;
+	border-radius: 4px;
+	transition: background-color 0.2s ease;
+}
+
+.kanban-task-target-time:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.kanban-task-target-time svg {
+	flex-shrink: 0;
+}
+
+.kanban-target-time-text {
+	font-weight: 500;
+}
+
+.kanban-target-time-empty {
+	font-style: italic;
+	opacity: 0.6;
+	font-weight: 400;
+}
+
+.kanban-target-time-input {
+	margin-top: 0.5rem;
+}
+
+.kanban-target-time-edit-input {
+	font-size: 0.85rem;
+	padding: 0.15rem 0.35rem;
+}
+
 /* Drag and Drop Styles */
 
 .kanban-task-draggable {
@@ -191,4 +262,276 @@ body.kanban-drag-active .kanban-column-tasks {
 body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	background-color: var(--interactive-accent-hover);
 	opacity: 0.8;
+}
+
+/* Timer Styles */
+
+.kanban-task-timer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-top: 0.5rem;
+	padding-top: 0.5rem;
+	border-top: 1px solid var(--background-modifier-border);
+	gap: 0.5rem;
+}
+
+.kanban-timer-display {
+	font-family: var(--font-monospace);
+	font-size: 0.85rem;
+	color: var(--text-muted);
+	font-weight: 500;
+}
+
+.kanban-timer-running {
+	color: var(--interactive-accent);
+	font-weight: 600;
+}
+
+.kanban-task-timer-running {
+	border-left: 3px solid var(--interactive-accent);
+	background-color: var(--background-modifier-hover);
+}
+
+.kanban-timer-buttons {
+	display: flex;
+	gap: 0.25rem;
+}
+
+.kanban-timer-button {
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 0.25rem;
+	border-radius: 4px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.2s ease;
+	color: var(--text-muted);
+	width: 28px;
+	height: 28px;
+}
+
+.kanban-timer-button:hover:not(.kanban-timer-button-disabled) {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.kanban-timer-button:active:not(.kanban-timer-button-disabled) {
+	transform: scale(0.95);
+}
+
+.kanban-timer-start:not(.kanban-timer-button-disabled) {
+	color: var(--color-green);
+}
+
+.kanban-timer-stop:not(.kanban-timer-button-disabled) {
+	color: var(--color-red);
+}
+
+.kanban-timer-button-disabled {
+	opacity: 0.3;
+	cursor: not-allowed;
+}
+
+.kanban-timer-button svg {
+	width: 16px;
+	height: 16px;
+}
+
+/* Progress Bar Styles */
+
+.kanban-progress-container {
+	margin-top: 0.75rem;
+	margin-bottom: 0.5rem;
+}
+
+.kanban-progress-bar {
+	width: 100%;
+	height: 8px;
+	background-color: var(--background-modifier-border);
+	border-radius: 4px;
+	overflow: hidden;
+	margin-bottom: 0.35rem;
+}
+
+.kanban-progress-fill {
+	height: 100%;
+	transition: width 0.3s ease, background-color 0.3s ease;
+	border-radius: 4px;
+}
+
+.kanban-progress-green {
+	background-color: var(--color-green);
+}
+
+.kanban-progress-yellow {
+	background-color: var(--color-yellow);
+}
+
+.kanban-progress-orange {
+	background-color: var(--color-orange);
+}
+
+.kanban-progress-red {
+	background-color: var(--color-red);
+}
+
+.kanban-progress-running {
+	animation: progress-pulse 2s ease-in-out infinite;
+}
+
+@keyframes progress-pulse {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.7;
+	}
+}
+
+.kanban-progress-text {
+	font-size: 0.75rem;
+	font-family: var(--font-monospace);
+	font-weight: 500;
+	text-align: center;
+	transition: color 0.3s ease;
+}
+
+.kanban-progress-text-green {
+	color: var(--color-green);
+}
+
+.kanban-progress-text-yellow {
+	color: var(--color-yellow);
+}
+
+.kanban-progress-text-orange {
+	color: var(--color-orange);
+}
+
+.kanban-progress-text-red {
+	color: var(--color-red);
+}
+
+.kanban-progress-text-running {
+	font-weight: 600;
+}
+
+/* Timer Entries Modal Styles */
+
+.timer-entries-container {
+	max-height: 500px;
+	overflow-y: auto;
+	margin: 1rem 0;
+}
+
+.timer-entries-empty {
+	text-align: center;
+	color: var(--text-muted);
+	padding: 2rem;
+	font-style: italic;
+}
+
+.timer-entry-item {
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	padding: 1rem;
+	margin-bottom: 1rem;
+}
+
+.timer-entry-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 0.75rem;
+	padding-bottom: 0.5rem;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.timer-entry-duration {
+	color: var(--text-muted);
+	font-size: 0.9rem;
+	margin-left: 0.5rem;
+}
+
+.timer-entry-delete {
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 0.25rem;
+	border-radius: 4px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	transition: all 0.2s ease;
+}
+
+.timer-entry-delete:hover {
+	background-color: var(--background-modifier-error);
+	color: var(--text-error);
+}
+
+.timer-entry-delete svg {
+	width: 16px;
+	height: 16px;
+}
+
+.modal-button-container .setting-item {
+	border: none;
+	padding: 0;
+}
+
+.modal-button-container .setting-item-control {
+	justify-content: flex-end;
+}
+
+/* Add Status Modal Styles */
+
+.existing-statuses {
+	margin-top: 1rem;
+	padding: 1rem;
+	background-color: var(--background-secondary);
+	border-radius: 6px;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.existing-statuses ul {
+	margin: 0.5rem 0 0 0;
+	padding-left: 1.5rem;
+	list-style-type: disc;
+}
+
+.existing-statuses li {
+	padding: 0.15rem 0;
+	color: var(--text-muted);
+}
+
+/* Create Kanban Modal Styles */
+
+.create-kanban-info {
+	margin-top: 1rem;
+	padding: 1rem;
+	background-color: var(--background-secondary);
+	border-radius: 6px;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.create-kanban-info p {
+	margin: 0 0 0.5rem 0;
+}
+
+.create-kanban-examples {
+	margin: 0.5rem 0 0 0;
+	padding-left: 1.5rem;
+	list-style-type: disc;
+}
+
+.create-kanban-examples li {
+	padding: 0.25rem 0;
+	color: var(--text-muted);
+	font-size: 0.9rem;
 }
