@@ -356,6 +356,9 @@ export function renderKanban(
 		// Initial due date display
 		updateDueDateDisplay();
 		
+		// Store update function for external calls
+		(taskEl as any).updateDueDateDisplay = updateDueDateDisplay;
+		
 		// Double-click to edit due date
 		dueDateEl.addEventListener("dblclick", (e) => {
 			e.stopPropagation();
@@ -1302,6 +1305,16 @@ export function renderKanban(
 				// Update both the status in the info and the task object
 				taskInfo.status = targetStatus;
 				taskInfo.task.status = targetStatus;
+				
+				// Update due date to current datetime when moving between statuses
+				taskInfo.task.dueDate = moment().toISOString();
+				console.log("Kanban: Updated due date to current time:", taskInfo.task.dueDate);
+				
+				// Update the due date display if the update function exists
+				const dueDateUpdateFn = (taskEl as any).updateDueDateDisplay;
+				if (dueDateUpdateFn) {
+					dueDateUpdateFn();
+				}
 				
 				console.log("Kanban: Updating task", taskText, "to status", targetStatus);
 				
