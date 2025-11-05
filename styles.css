@@ -4,6 +4,95 @@
 	padding: 1rem;
 }
 
+.kanban-header {
+	margin-bottom: 1rem;
+	display: flex;
+	justify-content: flex-end;
+}
+
+.kanban-add-task-button {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border: none;
+	border-radius: 4px;
+	padding: 0.5rem 1rem;
+	font-size: 0.9rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: background-color 0.2s ease;
+}
+
+.kanban-add-task-button:hover {
+	background-color: var(--interactive-accent-hover);
+}
+
+.kanban-add-task-button:active {
+	transform: scale(0.98);
+}
+
+.kanban-task-input-container {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	width: 100%;
+	max-width: 400px;
+	margin-left: auto;
+}
+
+.kanban-task-input {
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	padding: 0.5rem 0.75rem;
+	font-size: 0.9rem;
+	color: var(--text-normal);
+	outline: none;
+	transition: border-color 0.2s ease;
+}
+
+.kanban-task-input:focus {
+	border-color: var(--interactive-accent);
+}
+
+.kanban-task-input-buttons {
+	display: flex;
+	gap: 0.5rem;
+	justify-content: flex-end;
+}
+
+.kanban-task-input-confirm,
+.kanban-task-input-cancel {
+	border: none;
+	border-radius: 4px;
+	padding: 0.4rem 0.8rem;
+	font-size: 0.85rem;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.kanban-task-input-confirm {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.kanban-task-input-confirm:hover {
+	background-color: var(--interactive-accent-hover);
+}
+
+.kanban-task-input-cancel {
+	background-color: var(--background-secondary);
+	color: var(--text-normal);
+}
+
+.kanban-task-input-cancel:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.kanban-task-input-confirm:active,
+.kanban-task-input-cancel:active {
+	transform: scale(0.98);
+}
+
 .kanban-error {
 	color: var(--text-error);
 	padding: 0.5rem;
@@ -47,6 +136,8 @@
 	flex-direction: column;
 	gap: 0.75rem;
 	flex: 1;
+	min-height: 50px;
+	transition: background-color 0.2s ease;
 }
 
 .kanban-task {
@@ -66,4 +157,38 @@
 .kanban-task-content {
 	color: var(--text-normal);
 	line-height: 1.4;
+}
+
+/* Drag and Drop Styles */
+
+.kanban-task-draggable {
+	cursor: grab;
+	user-select: none;
+}
+
+.kanban-task-draggable:active {
+	cursor: grabbing;
+}
+
+.kanban-task-dragging {
+	opacity: 0.5;
+	transform: scale(0.95);
+}
+
+.kanban-column-dropzone {
+	transition: background-color 0.2s ease;
+}
+
+.kanban-column-drag-over {
+	background-color: var(--background-modifier-hover);
+	border: 2px dashed var(--interactive-accent);
+}
+
+body.kanban-drag-active .kanban-column-tasks {
+	background-color: var(--background-modifier-hover);
+}
+
+body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
+	background-color: var(--interactive-accent-hover);
+	opacity: 0.8;
 }

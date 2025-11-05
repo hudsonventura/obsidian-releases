@@ -1,7 +1,8 @@
+export type KanbanStatus = "todo" | "in progress" | "done";
+
 export interface KanbanTask {
 	task: string;
-	status?: string;
-	column?: string;
+	status?: KanbanStatus;
 }
 
 export interface KanbanData {
