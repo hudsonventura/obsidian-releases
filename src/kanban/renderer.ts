@@ -1,5 +1,5 @@
 import { Plugin, MarkdownPostProcessorContext, App, TFile, moment, Menu, MarkdownRenderer, Component } from "obsidian";
-import { KanbanTask, KanbanData, KanbanStatus, TimerEntry } from "../types";
+import { KanbanTask, KanbanData, KanbanStatus, TimerEntry, ColumnState, ColumnMetadata } from "../types";
 import { TimerEntriesModal } from "./timer-modal";
 import { AddTaskModal } from "./add-task-modal";
 import { AddStatusModal } from "./add-status-modal";
@@ -136,6 +136,33 @@ export function renderKanban(
 	const statusColumns: KanbanStatus[] = data.columns && data.columns.length > 0
 		? data.columns
 		: DEFAULT_COLUMNS;
+	
+	// Initialize column metadata with defaults if not present
+	if (!data.columnMetadata || data.columnMetadata.length === 0) {
+		data.columnMetadata = statusColumns.map(col => {
+			// Set default states based on column name
+			let state: ColumnState = "todo";
+			if (col === "in progress" || col === "in-progress" || col === "doing") {
+				state = "in-progress";
+			} else if (col === "done" || col === "completed" || col === "complete") {
+				state = "done";
+			}
+			return { name: col, state };
+		});
+	} else {
+		// Ensure all columns have metadata
+		statusColumns.forEach(col => {
+			if (!data.columnMetadata!.find(m => m.name === col)) {
+				data.columnMetadata!.push({ name: col, state: "todo" });
+			}
+		});
+	}
+	
+	// Helper function to get column state
+	const getColumnState = (status: KanbanStatus): ColumnState => {
+		const metadata = data.columnMetadata?.find(m => m.name === status);
+		return metadata?.state || "todo";
+	};
 	
 	// Group tasks by status
 	const tasksByStatus = new Map<KanbanStatus, KanbanTask[]>();
@@ -888,6 +915,7 @@ export function renderKanban(
 		await updateKanbanInFile(plugin.app, ctx, updatedTaskText || "", "todo" as KanbanStatus, originalSource, { 
 			tasks: allTasks, 
 			columns: data.columns,
+			columnMetadata: data.columnMetadata,
 			collapsedColumns: data.collapsedColumns
 		}).catch(err => {
 			console.error("Error saving tasks to file:", err);
@@ -921,10 +949,12 @@ export function renderKanban(
 		});
 		
 		console.log("Kanban: Saving collapsed state:", data.collapsedColumns);
+		console.log("Kanban: Saving column metadata:", data.columnMetadata);
 		
 		await updateKanbanInFile(plugin.app, ctx, "", "todo" as KanbanStatus, originalSource, { 
 			tasks: allTasks, 
 			columns: data.columns,
+			columnMetadata: data.columnMetadata,
 			collapsedColumns: data.collapsedColumns
 		}).catch(err => {
 			console.error("Error saving collapsed state to file:", err);
@@ -1044,11 +1074,77 @@ export function renderKanban(
 		collapseBtn.appendChild(chevronIcon);
 		
 		const headerTitle = headerEl.createEl("h3");
-		headerTitle.setText(displayName);
+		
+		// Add state indicator to title
+		const updateHeaderTitle = () => {
+			const columnState = getColumnState(status);
+			const stateEmoji = columnState === "in-progress" ? "▶️ " : columnState === "done" ? "✅ " : "";
+			headerTitle.setText(stateEmoji + displayName);
+		};
+		updateHeaderTitle();
 		
 		// Task count badge
 		const taskCountBadge = headerEl.createEl("span", {
 			cls: "kanban-column-count"
+		});
+		
+		// Add context menu to header for configuring column state
+		headerEl.addEventListener("contextmenu", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			
+			const menu = new Menu();
+			const currentState = getColumnState(status);
+			
+			menu.addItem((item) => {
+				item
+					.setTitle("Set as To Do State")
+					.setIcon("circle")
+					.setChecked(currentState === "todo")
+					.onClick(async () => {
+						const metadata = data.columnMetadata?.find(m => m.name === status);
+						if (metadata) {
+							metadata.state = "todo";
+							updateHeaderTitle();
+							await saveCollapsedState();
+							console.log("Kanban: Set column", status, "to todo state");
+						}
+					});
+			});
+			
+			menu.addItem((item) => {
+				item
+					.setTitle("Set as In Progress State")
+					.setIcon("play")
+					.setChecked(currentState === "in-progress")
+					.onClick(async () => {
+						const metadata = data.columnMetadata?.find(m => m.name === status);
+						if (metadata) {
+							metadata.state = "in-progress";
+							updateHeaderTitle();
+							await saveCollapsedState();
+							console.log("Kanban: Set column", status, "to in-progress state");
+						}
+					});
+			});
+			
+			menu.addItem((item) => {
+				item
+					.setTitle("Set as Done State")
+					.setIcon("check")
+					.setChecked(currentState === "done")
+					.onClick(async () => {
+						const metadata = data.columnMetadata?.find(m => m.name === status);
+						if (metadata) {
+							metadata.state = "done";
+							updateHeaderTitle();
+							await saveCollapsedState();
+							console.log("Kanban: Set column", status, "to done state");
+						}
+					});
+			});
+			
+			menu.showAtMouseEvent(e);
 		});
 		
 		// Column tasks container
@@ -1208,6 +1304,45 @@ export function renderKanban(
 				taskInfo.task.status = targetStatus;
 				
 				console.log("Kanban: Updating task", taskText, "to status", targetStatus);
+				
+				// Handle automatic timer control based on column state
+				const newColumnState = getColumnState(targetStatus);
+				
+				if (newColumnState === "in-progress") {
+					// Stop all other running timers
+					taskElements.forEach((info, otherTaskEl) => {
+						if (info.task !== taskInfo.task && isTaskTimerRunning(info.task)) {
+							stopTaskTimer(info.task);
+							// Update the display for the stopped task
+							const updateFn = (otherTaskEl as any).updateTimerDisplay;
+							if (updateFn) {
+								updateFn();
+							}
+							console.log("Kanban: Auto-stopped timer for task:", info.task.task);
+						}
+					});
+					
+					// Start the timer for this task if not already running
+					if (!isTaskTimerRunning(taskInfo.task)) {
+						startTaskTimer(taskInfo.task);
+						const updateFn = (taskEl as any).updateTimerDisplay;
+						if (updateFn) {
+							updateFn();
+						}
+						console.log("Kanban: Auto-started timer for task:", taskInfo.task.task);
+					}
+				} else {
+					// Stop the timer if running (for both "todo" and "done" states)
+					if (isTaskTimerRunning(taskInfo.task)) {
+						stopTaskTimer(taskInfo.task);
+						const updateFn = (taskEl as any).updateTimerDisplay;
+						if (updateFn) {
+							updateFn();
+						}
+						const stateLabel = newColumnState === "done" ? "done" : "todo";
+						console.log(`Kanban: Auto-stopped timer (task ${stateLabel}):`, taskInfo.task.task);
+					}
+				}
 				
 				// Update the file with the new status
 				saveTasksToFile(taskText).catch(err => {

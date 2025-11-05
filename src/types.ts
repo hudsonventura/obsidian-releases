@@ -1,5 +1,12 @@
 export type KanbanStatus = string; // Allows custom statuses in addition to default: "todo", "in progress", "done"
 
+export type ColumnState = "todo" | "in-progress" | "done";
+
+export interface ColumnMetadata {
+	name: string;
+	state: ColumnState;
+}
+
 export interface TimerEntry {
 	startTime: string;
 	endTime: string | null;
@@ -17,6 +24,7 @@ export interface KanbanTask {
 export interface KanbanData {
 	tasks?: KanbanTask[];
 	columns?: string[];
+	columnMetadata?: ColumnMetadata[]; // Metadata for columns including their state
 	collapsedColumns?: string[]; // Array of column names that are collapsed
 }
 
