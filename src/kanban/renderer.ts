@@ -4,6 +4,7 @@ import { TimerEntriesModal } from "./timer-modal";
 import { AddTaskModal } from "./add-task-modal";
 import { AddStatusModal } from "./add-status-modal";
 import { EditTagsModal } from "./edit-tags-modal";
+import { DueDateModal } from "./due-date-modal";
 
 const DEFAULT_COLUMNS: KanbanStatus[] = ["todo", "in progress", "done"];
 
@@ -329,91 +330,31 @@ export function renderKanban(
 		updateDueDateDisplay();
 		
 		// Double-click to edit due date
-		let isEditingDueDate = false;
 		dueDateEl.addEventListener("dblclick", (e) => {
 			e.stopPropagation();
-			if (isEditingDueDate) return;
 			
-			isEditingDueDate = true;
-			const currentDueDate = task.dueDate || "";
-			
-			// Create input field for datetime
-			const inputValue = currentDueDate ? moment(currentDueDate).format("YYYY-MM-DDTHH:mm") : "";
-			const input = dueDateText.createEl("input", {
-				type: "datetime-local",
-				cls: "kanban-task-edit-input kanban-due-date-edit-input",
-				value: inputValue
-			});
-			
-			// Clear the content and add input
-			dueDateText.empty();
-			dueDateText.appendChild(input);
-			
-			// Focus
-			input.focus();
-			
-			// Disable dragging while editing
-			taskEl.setAttr("draggable", "false");
-			taskEl.classList.remove("kanban-task-draggable");
-			
-			// Function to save changes
-			const saveEdit = async () => {
-				if (!isEditingDueDate) return;
-				
-				const newDueDate = input.value.trim();
-				
-				// Update task
-				if (newDueDate) {
-					task.dueDate = moment(newDueDate).toISOString();
-				} else {
-					task.dueDate = undefined;
-				}
-				
-				// Update display
-				updateDueDateDisplay();
-				
-				// Re-enable dragging
-				taskEl.setAttr("draggable", "true");
-				taskEl.classList.add("kanban-task-draggable");
-				isEditingDueDate = false;
-				
-				// Save to file
-				await saveTasksToFile(task.task);
-				console.log("Kanban: Due date updated:", task.dueDate);
-			};
-			
-			// Function to cancel edit
-			const cancelEdit = () => {
-				if (!isEditingDueDate) return;
-				
-				updateDueDateDisplay();
-				
-				// Re-enable dragging
-				taskEl.setAttr("draggable", "true");
-				taskEl.classList.add("kanban-task-draggable");
-				isEditingDueDate = false;
-			};
-			
-			// Handle keyboard shortcuts
-			input.addEventListener("keydown", async (e: KeyboardEvent) => {
-				if (e.key === "Enter") {
-					e.preventDefault();
-					await saveEdit();
-				} else if (e.key === "Escape") {
-					e.preventDefault();
-					cancelEdit();
-				}
-			});
-			
-			// Save on blur (click outside)
-			input.addEventListener("blur", async () => {
-				// Small delay to allow other click events to process
-				setTimeout(async () => {
-					if (isEditingDueDate) {
-						await saveEdit();
+			// Open calendar modal
+			const modal = new DueDateModal(
+				plugin.app,
+				task.dueDate,
+				async (newDate) => {
+					if (newDate === null) {
+						// Clear due date
+						task.dueDate = undefined;
+					} else {
+						// Set new due date
+						task.dueDate = newDate;
 					}
-				}, 100);
-			});
+					
+					// Update display
+					updateDueDateDisplay();
+					
+					// Save to file
+					await saveTasksToFile(task.task);
+					console.log("Kanban: Due date updated:", task.dueDate);
+				}
+			);
+			modal.open();
 		});
 		
 		// Timer buttons on the same row
