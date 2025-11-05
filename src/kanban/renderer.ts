@@ -3,6 +3,7 @@ import { KanbanTask, KanbanData, KanbanStatus, TimerEntry } from "../types";
 import { TimerEntriesModal } from "./timer-modal";
 import { AddTaskModal } from "./add-task-modal";
 import { AddStatusModal } from "./add-status-modal";
+import { EditTagsModal } from "./edit-tags-modal";
 
 const DEFAULT_COLUMNS: KanbanStatus[] = ["todo", "in progress", "done"];
 
@@ -528,6 +529,23 @@ export function renderKanban(
 			updateProgressBar();
 		}
 		
+		// Tags section (below progress bar)
+		const tagsContainer = taskEl.createDiv("kanban-task-tags");
+		
+		function updateTagsDisplay() {
+			tagsContainer.empty();
+			
+			if (task.tags && task.tags.length > 0) {
+				task.tags.forEach(tag => {
+					const tagEl = tagsContainer.createSpan("kanban-tag");
+					tagEl.setText(tag);
+				});
+			}
+		}
+		
+		// Initial tags display
+		updateTagsDisplay();
+		
         // Double-click to edit task name
         let isEditing = false;
         taskContent.addEventListener("dblclick", (e) => {
@@ -694,6 +712,34 @@ export function renderKanban(
 					});
 			});
 			
+			// Edit Tags option
+			menu.addItem((item) => {
+				item
+					.setTitle("Edit Tags")
+					.setIcon("tag")
+					.onClick(() => {
+						const modal = new EditTagsModal(
+							plugin.app,
+							task.tags || [],
+							async (tagsArray) => {
+								if (tagsArray === null) return; // User cancelled
+								
+								// Update task tags
+								task.tags = tagsArray.length > 0 ? tagsArray : undefined;
+								
+								// Update display
+								updateTagsDisplay();
+								
+								// Save to file
+								await saveTasksToFile(task.task);
+								
+								console.log("Kanban: Tags updated for task:", task.task, "New tags:", task.tags);
+							}
+						);
+						modal.open();
+					});
+			});
+			
 			// Delete Task option
 			menu.addSeparator();
 			menu.addItem((item) => {
@@ -745,6 +791,11 @@ export function renderKanban(
 				taskData.timerEntries = info.task.timerEntries;
 			}
 			
+			// Include tags if they exist
+			if (info.task.tags && info.task.tags.length > 0) {
+				taskData.tags = info.task.tags;
+			}
+			
 			allTasks.push(taskData);
 		});
 		
@@ -779,6 +830,11 @@ export function renderKanban(
 			// Include timer entries if they exist
 			if (info.task.timerEntries && info.task.timerEntries.length > 0) {
 				taskData.timerEntries = info.task.timerEntries;
+			}
+			
+			// Include tags if they exist
+			if (info.task.tags && info.task.tags.length > 0) {
+				taskData.tags = info.task.tags;
 			}
 			
 			allTasks.push(taskData);

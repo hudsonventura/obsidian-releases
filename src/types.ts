@@ -10,6 +10,7 @@ export interface KanbanTask {
 	status?: KanbanStatus;
 	timerEntries?: TimerEntry[];
 	targetTime?: string; // Due time for the task (e.g., "2h", "1d", "2025-12-31")
+	tags?: string[]; // Tags for the task (e.g., ["#Test", "#John_Master"])
 }
 
 export interface KanbanData {

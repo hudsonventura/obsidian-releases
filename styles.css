@@ -434,6 +434,39 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	height: 14px;
 }
 
+/* Tags Styles */
+
+.kanban-task-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	margin-top: 0.5rem;
+	padding-top: 0.4rem;
+	border-top: 1px solid var(--background-modifier-border);
+	min-height: 0;
+}
+
+.kanban-task-tags:empty {
+	display: none;
+}
+
+.kanban-tag {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.15rem 0.5rem;
+	background-color: var(--background-modifier-border);
+	color: var(--text-muted);
+	border-radius: 12px;
+	font-size: 0.7rem;
+	font-weight: 500;
+	transition: all 0.2s ease;
+}
+
+.kanban-tag:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
 /* Progress Bar Styles */
 
 .kanban-progress-container {
@@ -626,6 +659,32 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .create-kanban-examples li {
+	padding: 0.25rem 0;
+	color: var(--text-muted);
+	font-size: 0.9rem;
+}
+
+/* Edit Tags Modal Styles */
+
+.edit-tags-info {
+	margin-top: 1rem;
+	padding: 1rem;
+	background-color: var(--background-secondary);
+	border-radius: 6px;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.edit-tags-info p {
+	margin: 0 0 0.5rem 0;
+}
+
+.edit-tags-examples {
+	margin: 0.5rem 0 0 0;
+	padding-left: 1.5rem;
+	list-style-type: disc;
+}
+
+.edit-tags-examples li {
 	padding: 0.25rem 0;
 	color: var(--text-muted);
 	font-size: 0.9rem;
