@@ -444,7 +444,7 @@ async function updateKanbanInFile(
 			for (const candidateFile of allFiles) {
 				try {
 					const content = await app.vault.read(candidateFile as any);
-					const kanbanBlockRegex = /```kanban\s*\n?([\s\S]*?)\n?```/g;
+					const kanbanBlockRegex = /```\s*kanban\s*\n?([\s\S]*?)\n?```/g;
 					let match;
 					let found = false;
 					
@@ -524,71 +524,131 @@ async function updateKanbanInFile(
 		const content = await app.vault.read(file as any);
 		
 		// Find the kanban code block and update it
-		// Match kanban code blocks more flexibly - handle different whitespace patterns
-		const kanbanBlockRegex = /```kanban\s*\n?([\s\S]*?)\n?```/g;
+		// Match kanban code blocks more flexibly - handle different whitespace patterns (including spaces before "kanban")
+		const kanbanBlockRegex = /```\s*kanban\s*\n?([\s\S]*?)\n?```/g;
 		let updatedContent = content;
 		let found = false;
 		let matchCount = 0;
 
-		updatedContent = updatedContent.replace(kanbanBlockRegex, (match, blockContent) => {
-			matchCount++;
-			// Check if this is the block we're updating (compare normalized content)
-			const normalizedBlock = blockContent.trim();
-			const normalizedOriginal = originalSource.trim();
-			
-			// Determine if we should update this block
-			// For new tasks (taskText === ""), always update the first block
-			// For existing tasks, try to match by content first, but also check if the block contains the task
-			// If we can't find a match, update the first block (most common case)
-			const isNewTask = taskText === "";
-			const matchesOriginal = normalizedBlock === normalizedOriginal;
-			const isFirstBlock = matchCount === 1;
-			
-			// Check if this block contains the task we're updating (for status changes)
-			let containsTask = false;
-			if (taskText && !isNewTask) {
-				try {
-					const blockData = JSON.parse(normalizedBlock);
-					const tasks = Array.isArray(blockData) ? blockData : (blockData.tasks || []);
-					containsTask = tasks.some((t: any) => t.task === taskText);
-					if (containsTask) {
-						console.log("Kanban: Found task in block", matchCount, "task:", taskText);
-					}
-				} catch (e) {
-					// If parsing fails, ignore
-					console.warn("Kanban: Failed to parse block", matchCount, "for task matching:", e);
-				}
-			}
-			
-			const shouldUpdate = isNewTask ? isFirstBlock : 
-			                     (matchesOriginal || containsTask || (isFirstBlock && !found));
-			
-			if (shouldUpdate) {
-				console.log("Kanban: Will update block", matchCount, "isNewTask:", isNewTask, "matchesOriginal:", matchesOriginal, "containsTask:", containsTask);
-				found = true;
-				
-				// Use the updated data from currentData (which already has the updated status)
-				// This ensures we have all tasks with their current statuses
-				const updatedData = currentData;
-				
-				// Generate new JSON string - preserve original format
-				let newBlockContent: string;
-				if (normalizedBlock.startsWith("[")) {
-					// Original was array format
-					newBlockContent = JSON.stringify(updatedData.tasks || [], null, 2);
-				} else {
-					// Original was object format - preserve columns if they exist
-					newBlockContent = JSON.stringify(updatedData, null, 2);
-				}
-				
-				console.log("Kanban: Updating kanban block with", updatedData.tasks?.length || 0, "tasks");
-				console.log("Kanban: New block content:", newBlockContent);
-				
-				return `\`\`\`kanban\n${newBlockContent}\n\`\`\``;
-			}
-			
-			return match;
+	// First pass: scan all blocks to find the best match
+	interface BlockInfo {
+		match: string;
+		blockContent: string;
+		normalizedBlock: string;
+		blockTasks: any[];
+		matchCount: number;
+		containsTask: boolean;
+		hasSameTasks: boolean;
+		isValidKanbanBlock: boolean;
+	}
+	
+	const blocks: BlockInfo[] = [];
+	let tempMatchCount = 0;
+	
+	// Collect all kanban blocks
+	content.replace(kanbanBlockRegex, (match, blockContent) => {
+		tempMatchCount++;
+		const normalizedBlock = blockContent.trim();
+		
+		// Parse the block
+		let blockTasks: any[] = [];
+		let isValidKanbanBlock = false;
+		try {
+			const blockData = JSON.parse(normalizedBlock);
+			blockTasks = Array.isArray(blockData) ? blockData : (blockData.tasks || []);
+			isValidKanbanBlock = blockTasks.length > 0;
+		} catch (e) {
+			// Invalid block, skip
+		}
+		
+		// Check if this block contains the task we're updating
+		const containsTask = taskText ? blockTasks.some((t: any) => t && t.task === taskText) : false;
+		
+		// Check if this block contains the same set of tasks
+		const currentTaskTexts = (currentData.tasks || []).map(t => t.task).sort();
+		const blockTaskTexts = blockTasks.map((t: any) => t && t.task).filter(Boolean).sort();
+		const hasSameTasks = currentTaskTexts.length > 0 && 
+		                     currentTaskTexts.length === blockTaskTexts.length &&
+		                     currentTaskTexts.every((text, idx) => text === blockTaskTexts[idx]);
+		
+		blocks.push({
+			match,
+			blockContent,
+			normalizedBlock,
+			blockTasks,
+			matchCount: tempMatchCount,
+			containsTask,
+			hasSameTasks,
+			isValidKanbanBlock
 		});
+		
+		return match;
+	});
+	
+	console.log("Kanban: Found", blocks.length, "kanban blocks");
+	
+	// Determine which block to update
+	let blockToUpdate: BlockInfo | null = null;
+	const isNewTask = taskText === "";
+	
+	if (isNewTask) {
+		// For new tasks, update the first valid block
+		blockToUpdate = blocks.find(b => b.isValidKanbanBlock) || blocks[0] || null;
+		console.log("Kanban: New task - will update block", blockToUpdate?.matchCount);
+	} else {
+		// For task updates, prioritize: containsTask > hasSameTasks > first block
+		blockToUpdate = blocks.find(b => b.containsTask) || 
+		                blocks.find(b => b.hasSameTasks) ||
+		                blocks[0] ||
+		                null;
+		
+		if (blockToUpdate) {
+			if (blockToUpdate.containsTask) {
+				console.log("Kanban: Found block containing task:", taskText, "- block", blockToUpdate.matchCount);
+			} else if (blockToUpdate.hasSameTasks) {
+				console.log("Kanban: Found block with same task set - block", blockToUpdate.matchCount);
+			} else {
+				console.log("Kanban: Using first block as fallback - block", blockToUpdate.matchCount);
+			}
+		}
+	}
+	
+	if (!blockToUpdate) {
+		console.warn("Kanban: No kanban blocks found to update");
+		return;
+	}
+	
+	// Second pass: update only the selected block
+	matchCount = 0;
+	updatedContent = updatedContent.replace(kanbanBlockRegex, (match, blockContent) => {
+		matchCount++;
+		
+		// Only update the block we selected
+		if (matchCount === blockToUpdate!.matchCount) {
+			found = true;
+			const normalizedBlock = blockContent.trim();
+			
+			// Use the updated data from currentData (which already has the updated status)
+			const updatedData = currentData;
+			
+			// Generate new JSON string - preserve original format
+			let newBlockContent: string;
+			if (normalizedBlock.startsWith("[")) {
+				// Original was array format
+				newBlockContent = JSON.stringify(updatedData.tasks || [], null, 2);
+			} else {
+				// Original was object format - preserve columns if they exist
+				newBlockContent = JSON.stringify(updatedData, null, 2);
+			}
+			
+			console.log("Kanban: Updating kanban block", matchCount, "with", updatedData.tasks?.length || 0, "tasks");
+			console.log("Kanban: New block content:", newBlockContent);
+			
+			return `\`\`\`kanban\n${newBlockContent}\n\`\`\``;
+		}
+		
+		return match;
+	});
 
 		if (found && updatedContent !== content) {
 			await app.vault.modify(file as any, updatedContent);
