@@ -1,5 +1,5 @@
 import { Plugin, MarkdownPostProcessorContext, App, TFile, moment, Menu, MarkdownRenderer, Component } from "obsidian";
-import { KanbanTask, KanbanData, KanbanStatus, TimerEntry, ColumnState, ColumnMetadata } from "../types";
+import { KanbanTask, KanbanData, KanbanStatus, TimerEntry, ColumnState, ColumnMetadata, KanbanView } from "../types";
 import { TimerEntriesModal } from "./timer-modal";
 import { AddTaskModal } from "./add-task-modal";
 import { AddStatusModal } from "./add-status-modal";
@@ -164,6 +164,11 @@ export function renderKanban(
 		return metadata?.state || "todo";
 	};
 	
+	// Initialize view mode (default to horizontal)
+	if (!data.view) {
+		data.view = "horizontal";
+	}
+	
 	// Group tasks by status
 	const tasksByStatus = new Map<KanbanStatus, KanbanTask[]>();
 	
@@ -182,6 +187,38 @@ export function renderKanban(
 	
 	// Create header with buttons
 	const headerEl = containerEl.createDiv("kanban-header");
+	
+	// View toggle button on the left
+	const viewToggleButton = headerEl.createEl("button", { 
+		cls: "kanban-view-toggle-button"
+	});
+	
+	const updateViewButton = () => {
+		if (data.view === "horizontal") {
+			viewToggleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg><span>Vertical View</span>`;
+		} else {
+			viewToggleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg><span>Horizontal View</span>`;
+		}
+	};
+	updateViewButton();
+	
+	viewToggleButton.addEventListener("click", async () => {
+		// Toggle view
+		data.view = data.view === "horizontal" ? "vertical" : "horizontal";
+		
+		// Update button
+		updateViewButton();
+		
+		// Update board classes
+		boardEl.removeClass("kanban-board-horizontal", "kanban-board-vertical");
+		boardEl.addClass(`kanban-board-${data.view}`);
+		
+		// Save view preference
+		await saveViewPreference();
+		
+		console.log("Kanban: View toggled to", data.view);
+	});
+	
 	const addStatusButton = headerEl.createEl("button", { 
 		cls: "kanban-add-status-button",
 		text: "+ Add Status"
@@ -193,6 +230,9 @@ export function renderKanban(
 	
 	// Create kanban board
 	const boardEl = containerEl.createDiv("kanban-board");
+	
+	// Apply view class
+	boardEl.addClass(`kanban-board-${data.view}`);
 	
 	// Create columns
 	const columnElements = new Map<KanbanStatus, HTMLElement>();
@@ -963,7 +1003,8 @@ export function renderKanban(
 			tasks: allTasks, 
 			columns: data.columns,
 			columnMetadata: data.columnMetadata,
-			collapsedColumns: data.collapsedColumns
+			collapsedColumns: data.collapsedColumns,
+			view: data.view
 		}).catch(err => {
 			console.error("Error saving tasks to file:", err);
 		});
@@ -1002,9 +1043,59 @@ export function renderKanban(
 			tasks: allTasks, 
 			columns: data.columns,
 			columnMetadata: data.columnMetadata,
-			collapsedColumns: data.collapsedColumns
+			collapsedColumns: data.collapsedColumns,
+			view: data.view
 		}).catch(err => {
 			console.error("Error saving collapsed state to file:", err);
+		});
+	}
+	
+	async function saveViewPreference() {
+		const allTasks: KanbanTask[] = [];
+		taskElements.forEach((info) => {
+			const taskData: KanbanTask = { 
+				task: info.task.task, 
+				status: info.status
+			};
+			
+			// Include target time if it exists
+			if (info.task.targetTime) {
+				taskData.targetTime = info.task.targetTime;
+			}
+			
+			// Include timer entries if they exist
+			if (info.task.timerEntries && info.task.timerEntries.length > 0) {
+				taskData.timerEntries = info.task.timerEntries;
+			}
+			
+			// Include tags if they exist
+			if (info.task.tags && info.task.tags.length > 0) {
+				taskData.tags = info.task.tags;
+			}
+			
+			// Include due date if it exists
+			if (info.task.dueDate) {
+				taskData.dueDate = info.task.dueDate;
+			}
+			
+			// Include update datetime if it exists
+			if (info.task.updateDateTime) {
+				taskData.updateDateTime = info.task.updateDateTime;
+			}
+			
+			allTasks.push(taskData);
+		});
+		
+		console.log("Kanban: Saving view preference:", data.view);
+		
+		await updateKanbanInFile(plugin.app, ctx, "", "todo" as KanbanStatus, originalSource, { 
+			tasks: allTasks, 
+			columns: data.columns,
+			columnMetadata: data.columnMetadata,
+			collapsedColumns: data.collapsedColumns,
+			view: data.view
+		}).catch(err => {
+			console.error("Error saving view preference to file:", err);
 		});
 	}
 	

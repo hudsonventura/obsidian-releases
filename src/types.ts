@@ -22,10 +22,13 @@ export interface KanbanTask {
 	updateDateTime?: string; // Last update date/time (ISO string format)
 }
 
+export type KanbanView = "horizontal" | "vertical";
+
 export interface KanbanData {
 	tasks?: KanbanTask[];
 	columns?: string[];
 	columnMetadata?: ColumnMetadata[]; // Metadata for columns including their state
 	collapsedColumns?: string[]; // Array of column names that are collapsed
+	view?: KanbanView; // View mode: horizontal (statuses stacked) or vertical (statuses side-by-side)
 }
 
