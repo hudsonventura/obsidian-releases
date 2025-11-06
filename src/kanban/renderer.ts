@@ -1508,6 +1508,7 @@ export function renderKanban(
 		if (isCollapsed) {
 			columnEl.addClass("kanban-column-collapsed");
 			tasksEl.style.display = "none";
+			sortButtonsContainer.style.display = "none";
 			chevronIcon.innerHTML = '<polyline points="9 18 15 12 9 6"></polyline>';
 		}
 		
@@ -1519,6 +1520,7 @@ export function renderKanban(
 			if (isCollapsed) {
 				columnEl.addClass("kanban-column-collapsed");
 				tasksEl.style.display = "none";
+				sortButtonsContainer.style.display = "none";
 				chevronIcon.innerHTML = '<polyline points="9 18 15 12 9 6"></polyline>';
 				
 				// Add to collapsed columns
@@ -1531,6 +1533,7 @@ export function renderKanban(
 			} else {
 				columnEl.removeClass("kanban-column-collapsed");
 				tasksEl.style.display = "flex";
+				sortButtonsContainer.style.display = "flex";
 				chevronIcon.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
 				
 				// Remove from collapsed columns
