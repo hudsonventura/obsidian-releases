@@ -180,9 +180,16 @@ export function renderKanban(
 	if (data.tasks) {
 		data.tasks.forEach(task => {
 			const status = task.status || "todo";
-			const existing = tasksByStatus.get(status) || [];
+			// Try exact match first, then case-insensitive match
+			let matchedStatus = statusColumns.find(col => col === status);
+			if (!matchedStatus) {
+				matchedStatus = statusColumns.find(col => col.toLowerCase() === status.toLowerCase());
+			}
+			const finalStatus = matchedStatus || status;
+			
+			const existing = tasksByStatus.get(finalStatus) || [];
 			existing.push(task);
-			tasksByStatus.set(status, existing);
+			tasksByStatus.set(finalStatus, existing);
 		});
 	}
 	
@@ -1242,16 +1249,26 @@ export function renderKanban(
 				return;
 			}
 			
-			// Find the first column (prefer "todo" if it exists, otherwise use first available)
-			const firstStatus = statusColumns[0];
-			let targetColumn = columnElements.get("todo");
-			let targetStatus: KanbanStatus = "todo";
-			
-			if (!targetColumn && firstStatus) {
-				// "todo" doesn't exist, use first column
-				targetColumn = columnElements.get(firstStatus);
-				targetStatus = firstStatus;
+		// Find the first column with state "todo", otherwise use first available column
+		const firstStatus = statusColumns[0];
+		let targetColumn: HTMLElement | undefined;
+		let targetStatus: KanbanStatus = firstStatus;
+		
+		// Look for the first column with state "todo"
+		for (const status of statusColumns) {
+			const columnState = getColumnState(status);
+			if (columnState === "todo") {
+				targetColumn = columnElements.get(status);
+				targetStatus = status;
+				break;
 			}
+		}
+		
+		// If no column has state "todo", use the first column
+		if (!targetColumn && firstStatus) {
+			targetColumn = columnElements.get(firstStatus);
+			targetStatus = firstStatus;
+		}
 			
 			if (!targetColumn) {
 				console.error("Kanban: Could not find any column to add task");
@@ -1587,7 +1604,9 @@ export function renderKanban(
 			
 			// Render sorted tasks
 			sortedTasks.forEach(task => {
-				createTaskElement(task, task.status || "todo", tasksEl);
+				// Update task status to match the column name (handles case normalization)
+				task.status = status;
+				createTaskElement(task, status, tasksEl);
 			});
 		};
 		
