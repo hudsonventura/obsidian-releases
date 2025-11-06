@@ -480,7 +480,47 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	height: 14px;
 }
 
-/* Due Date Styles */
+/* DateTime Row Styles */
+
+.kanban-task-datetime-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	margin-top: 0.5rem;
+	padding-top: 0.4rem;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.kanban-task-update-datetime {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	color: var(--text-muted);
+	font-size: 0.75rem;
+	padding: 0.25rem;
+	border-radius: 4px;
+	flex: 1 1 auto;
+	min-width: fit-content;
+}
+
+.kanban-task-update-datetime svg {
+	flex-shrink: 0;
+	width: 12px;
+	height: 12px;
+}
+
+.kanban-update-datetime-text {
+	font-weight: 500;
+	white-space: nowrap;
+	color: var(--text-muted);
+}
+
+.kanban-update-datetime-empty {
+	font-style: italic;
+	opacity: 0.6;
+	font-weight: 400;
+}
 
 .kanban-task-due-date {
 	display: flex;
