@@ -5,6 +5,7 @@ import { AddTaskModal } from "./add-task-modal";
 import { AddStatusModal } from "./add-status-modal";
 import { EditTagsModal } from "./edit-tags-modal";
 import { DueDateModal } from "./due-date-modal";
+import { EditTargetTimeModal } from "./edit-target-time-modal";
 
 const DEFAULT_COLUMNS: KanbanStatus[] = ["todo", "in progress", "done"];
 
@@ -592,51 +593,75 @@ export function renderKanban(
 		let progressText: HTMLElement | undefined;
 		
 		function updateProgressBar() {
-			if (!progressFill || !progressText || !task.targetTime) return;
+			if (!progressFill || !progressText) return;
 			
 			const totalDuration = getTaskTimerDuration(task);
-			const targetDuration = parseTargetTime(task.targetTime);
+			const isRunning = isTaskTimerRunning(task);
 			
-			if (targetDuration > 0) {
-				const percentage = (totalDuration / targetDuration) * 100;
-				const displayPercentage = Math.min(100, percentage);
+			if (task.targetTime) {
+				// Has target time - show progress bar with percentage
+				const targetDuration = parseTargetTime(task.targetTime);
 				
-				progressFill.setCssStyles({ width: `${displayPercentage}%` });
+				if (targetDuration > 0) {
+					const percentage = (totalDuration / targetDuration) * 100;
+					const displayPercentage = Math.min(100, percentage);
+					
+					progressFill.setCssStyles({ width: `${displayPercentage}%` });
+					progressFill.style.display = "block";
+					
+					// Remove all color classes
+					progressFill.removeClass("kanban-progress-green");
+					progressFill.removeClass("kanban-progress-yellow");
+					progressFill.removeClass("kanban-progress-orange");
+					progressFill.removeClass("kanban-progress-red");
+					progressText.removeClass("kanban-progress-text-green");
+					progressText.removeClass("kanban-progress-text-yellow");
+					progressText.removeClass("kanban-progress-text-orange");
+					progressText.removeClass("kanban-progress-text-red");
+					
+					// Add appropriate color class based on percentage
+					let colorClass = "green";
+					if (percentage >= 100) {
+						colorClass = "red";
+					} else if (percentage >= 85) {
+						colorClass = "orange";
+					} else if (percentage >= 70) {
+						colorClass = "yellow";
+					}
+					
+					progressFill.addClass(`kanban-progress-${colorClass}`);
+					progressText.addClass(`kanban-progress-text-${colorClass}`);
+					
+					// Add running indicator
+					if (isRunning) {
+						progressFill.addClass("kanban-progress-running");
+					} else {
+						progressFill.removeClass("kanban-progress-running");
+					}
+					
+					// Format the text
+					const runningText = isRunning ? " ● RUNNING" : "";
+					progressText.setText(`${formatTimerDuration(totalDuration)} / ${task.targetTime} (${percentage.toFixed(1)}%)${runningText}`);
+					
+					if (isRunning) {
+						progressText.addClass("kanban-progress-text-running");
+					} else {
+						progressText.removeClass("kanban-progress-text-running");
+					}
+				}
+			} else {
+				// No target time - just show time spent without bar fill
+				progressFill.style.display = "none";
 				
 				// Remove all color classes
-				progressFill.removeClass("kanban-progress-green");
-				progressFill.removeClass("kanban-progress-yellow");
-				progressFill.removeClass("kanban-progress-orange");
-				progressFill.removeClass("kanban-progress-red");
 				progressText.removeClass("kanban-progress-text-green");
 				progressText.removeClass("kanban-progress-text-yellow");
 				progressText.removeClass("kanban-progress-text-orange");
 				progressText.removeClass("kanban-progress-text-red");
 				
-				// Add appropriate color class based on percentage
-				let colorClass = "green";
-				if (percentage >= 100) {
-					colorClass = "red";
-				} else if (percentage >= 85) {
-					colorClass = "orange";
-				} else if (percentage >= 70) {
-					colorClass = "yellow";
-				}
-				
-				progressFill.addClass(`kanban-progress-${colorClass}`);
-				progressText.addClass(`kanban-progress-text-${colorClass}`);
-				
-				// Add running indicator
-				const isRunning = isTaskTimerRunning(task);
-				if (isRunning) {
-					progressFill.addClass("kanban-progress-running");
-				} else {
-					progressFill.removeClass("kanban-progress-running");
-				}
-				
-				// Format the text
+				// Format the text - just time spent
 				const runningText = isRunning ? " ● RUNNING" : "";
-				progressText.setText(`${formatTimerDuration(totalDuration)} / ${task.targetTime} (${percentage.toFixed(1)}%)${runningText}`);
+				progressText.setText(`${formatTimerDuration(totalDuration)}${runningText}`);
 				
 				if (isRunning) {
 					progressText.addClass("kanban-progress-text-running");
@@ -708,16 +733,14 @@ export function renderKanban(
 		// Store update function for interval
 		(taskEl as any).updateTimerDisplay = updateTimerDisplay;
 		
-		// Progress bar at the bottom (only if target time exists)
-		if (task.targetTime && parseTargetTime(task.targetTime) > 0) {
-			progressContainer = taskEl.createDiv("kanban-progress-container");
-			const progressBar = progressContainer.createDiv("kanban-progress-bar");
-			progressFill = progressBar.createDiv("kanban-progress-fill");
-			progressText = progressContainer.createDiv("kanban-progress-text");
-			
-			// Initial update
-			updateProgressBar();
-		}
+		// Progress bar at the bottom (always visible)
+		progressContainer = taskEl.createDiv("kanban-progress-container");
+		const progressBar = progressContainer.createDiv("kanban-progress-bar");
+		progressFill = progressBar.createDiv("kanban-progress-fill");
+		progressText = progressContainer.createDiv("kanban-progress-text");
+		
+		// Initial update
+		updateProgressBar();
 		
 		// DateTime row (update datetime and due date)
 		const dateTimeRow = taskEl.createDiv("kanban-task-datetime-row");
@@ -1018,36 +1041,68 @@ export function renderKanban(
 					});
 			});
 			
-			// Edit Tags option
-			menu.addItem((item) => {
-				item
-					.setTitle("Edit Tags")
-					.setIcon("tag")
-					.onClick(() => {
-						const modal = new EditTagsModal(
-							plugin.app,
-							task.tags || [],
-							async (tagsArray) => {
-								if (tagsArray === null) return; // User cancelled
-								
-								// Update task tags
-								task.tags = tagsArray.length > 0 ? tagsArray : undefined;
-								
-								// Update display
-								updateTagsDisplay();
-								
-								// Save to file
-								await saveTasksToFile(task.task);
-								
-								console.log("Kanban: Tags updated for task:", task.task, "New tags:", task.tags);
+		// Edit Tags option
+		menu.addItem((item) => {
+			item
+				.setTitle("Edit Tags")
+				.setIcon("tag")
+				.onClick(() => {
+					const modal = new EditTagsModal(
+						plugin.app,
+						task.tags || [],
+						async (tagsArray) => {
+							if (tagsArray === null) return; // User cancelled
+							
+							// Update task tags
+							task.tags = tagsArray.length > 0 ? tagsArray : undefined;
+							
+							// Update display
+							updateTagsDisplay();
+							
+							// Save to file
+							await saveTasksToFile(task.task);
+							
+							console.log("Kanban: Tags updated for task:", task.task, "New tags:", task.tags);
+						}
+					);
+					modal.open();
+				});
+		});
+		
+		// Edit Target Time option
+		menu.addItem((item) => {
+			item
+				.setTitle("Edit Target Time")
+				.setIcon("target")
+				.onClick(() => {
+					const modal = new EditTargetTimeModal(
+						plugin.app,
+						task.targetTime,
+						async (newTargetTime) => {
+							if (newTargetTime === null) return; // User cancelled
+							
+							// Update task target time
+							if (newTargetTime === "") {
+								task.targetTime = undefined;
+							} else {
+								task.targetTime = newTargetTime;
 							}
-						);
-						modal.open();
-					});
-			});
-			
-			// Delete Task option
-			menu.addSeparator();
+							
+							// Update the display
+							updateProgressBar();
+							
+							// Save to file
+							await saveTasksToFile(task.task);
+							
+							console.log("Kanban: Target time updated for task:", task.task, "New target:", task.targetTime);
+						}
+					);
+					modal.open();
+				});
+		});
+		
+		// Delete Task option
+		menu.addSeparator();
 			menu.addItem((item) => {
 				item
 					.setTitle("Delete Task")
