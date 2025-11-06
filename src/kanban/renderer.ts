@@ -1126,6 +1126,16 @@ export function renderKanban(
 				taskData.tags = info.task.tags;
 			}
 			
+			// Include due date if it exists
+			if (info.task.dueDate) {
+				taskData.dueDate = info.task.dueDate;
+			}
+			
+			// Include update datetime if it exists
+			if (info.task.updateDateTime) {
+				taskData.updateDateTime = info.task.updateDateTime;
+			}
+			
 			allTasks.push(taskData);
 		});
 		
@@ -1548,8 +1558,21 @@ export function renderKanban(
 		
 		// Function to sort and render tasks
 		const sortAndRenderTasks = () => {
-			const tasks = tasksByStatus.get(status) || [];
-			const sortedTasks = sortTasks(tasks);
+			// Get current tasks - check taskElements first (for re-sorting with updated data)
+			let currentTasks: KanbanTask[] = [];
+			taskElements.forEach((info, el) => {
+				// Only include tasks from this column
+				if (info.status === status) {
+					currentTasks.push(info.task);
+				}
+			});
+			
+			// If no tasks found in taskElements (initial render), use tasksByStatus
+			if (currentTasks.length === 0) {
+				currentTasks = tasksByStatus.get(status) || [];
+			}
+			
+			const sortedTasks = sortTasks(currentTasks);
 			
 			// Remove old task elements from the taskElements Map
 			const oldElements = Array.from(tasksEl.children);
