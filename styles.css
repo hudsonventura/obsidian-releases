@@ -353,6 +353,47 @@
 	flex-shrink: 0;
 }
 
+.kanban-sort-buttons {
+	display: flex;
+	gap: 0.25rem;
+	align-items: center;
+}
+
+.kanban-sort-field-button,
+.kanban-sort-order-button {
+	background: none;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	cursor: pointer;
+	padding: 0.25rem 0.5rem;
+	font-size: 0.7rem;
+	color: var(--text-muted);
+	transition: all 0.2s ease;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.25rem;
+	white-space: nowrap;
+}
+
+.kanban-sort-field-button:hover,
+.kanban-sort-order-button:hover {
+	background-color: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+	color: var(--text-normal);
+}
+
+.kanban-sort-field-button:active,
+.kanban-sort-order-button:active {
+	transform: scale(0.95);
+}
+
+.kanban-sort-order-button {
+	min-width: 24px;
+	font-size: 1rem;
+	font-weight: bold;
+}
+
 /* Task containers are scoped to views */
 
 .kanban-task {

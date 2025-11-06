@@ -1,5 +1,5 @@
 import { Plugin, MarkdownPostProcessorContext, App, TFile, moment, Menu, MarkdownRenderer, Component } from "obsidian";
-import { KanbanTask, KanbanData, KanbanStatus, TimerEntry, ColumnState, ColumnMetadata, KanbanView } from "../types";
+import { KanbanTask, KanbanData, KanbanStatus, TimerEntry, ColumnState, ColumnMetadata, KanbanView, SortField, SortOrder } from "../types";
 import { TimerEntriesModal } from "./timer-modal";
 import { AddTaskModal } from "./add-task-modal";
 import { AddStatusModal } from "./add-status-modal";
@@ -1226,6 +1226,85 @@ export function renderKanban(
 			cls: "kanban-column-count"
 		});
 		
+		// Sort buttons container
+		const sortButtonsContainer = headerEl.createDiv("kanban-sort-buttons");
+		
+		// Sort field button
+		const sortFieldButton = sortButtonsContainer.createEl("button", {
+			cls: "kanban-sort-field-button",
+			attr: { "aria-label": "Sort field" }
+		});
+		
+		// Sort order button
+		const sortOrderButton = sortButtonsContainer.createEl("button", {
+			cls: "kanban-sort-order-button",
+			attr: { "aria-label": "Sort order" }
+		});
+		
+		// Get column metadata
+		const getColumnMetadata = () => {
+			let metadata = data.columnMetadata?.find(m => m.name === status);
+			if (!metadata) {
+				metadata = { name: status, state: "todo", sortField: "updateDateTime", sortOrder: "desc" };
+				if (!data.columnMetadata) {
+					data.columnMetadata = [];
+				}
+				data.columnMetadata.push(metadata);
+			}
+			if (!metadata.sortField) metadata.sortField = "updateDateTime";
+			if (!metadata.sortOrder) metadata.sortOrder = "desc";
+			return metadata;
+		};
+		
+		// Update sort button displays
+		const updateSortButtons = () => {
+			const metadata = getColumnMetadata();
+			
+			// Update field button
+			const fieldIcons: Record<SortField, string> = {
+				"updateDateTime": "🔄",
+				"dueDate": "📅",
+				"title": "📝",
+				"timeSpent": "⏱️"
+			};
+			const fieldLabels: Record<SortField, string> = {
+				"updateDateTime": "Update",
+				"dueDate": "Due",
+				"title": "Title",
+				"timeSpent": "Time"
+			};
+			sortFieldButton.innerHTML = `${fieldIcons[metadata.sortField!]} ${fieldLabels[metadata.sortField!]}`;
+			
+			// Update order button
+			sortOrderButton.innerHTML = metadata.sortOrder === "asc" ? "↑" : "↓";
+		};
+		
+		updateSortButtons();
+		
+		// Sort field button click - cycle through sort fields
+		sortFieldButton.addEventListener("click", async (e) => {
+			e.stopPropagation();
+			const metadata = getColumnMetadata();
+			const fields: SortField[] = ["updateDateTime", "dueDate", "title", "timeSpent"];
+			const currentIndex = fields.indexOf(metadata.sortField!);
+			metadata.sortField = fields[(currentIndex + 1) % fields.length];
+			updateSortButtons();
+			sortAndRenderTasks();
+			await saveCollapsedState();
+			console.log("Kanban: Changed sort field to", metadata.sortField);
+		});
+		
+		// Sort order button click - toggle asc/desc
+		sortOrderButton.addEventListener("click", async (e) => {
+			e.stopPropagation();
+			const metadata = getColumnMetadata();
+			metadata.sortOrder = metadata.sortOrder === "asc" ? "desc" : "asc";
+			updateSortButtons();
+			sortAndRenderTasks();
+			await saveCollapsedState();
+			console.log("Kanban: Changed sort order to", metadata.sortOrder);
+		});
+		
 		// Add context menu to header for configuring column state
 		headerEl.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
@@ -1339,12 +1418,65 @@ export function renderKanban(
 			// Save the collapsed state to file
 			await saveCollapsedState();
 		});
-		const tasks = tasksByStatus.get(status) || [];
+		// Function to sort tasks
+		const sortTasks = (tasks: KanbanTask[]): KanbanTask[] => {
+			const metadata = getColumnMetadata();
+			const sorted = [...tasks];
+			
+			sorted.sort((a, b) => {
+				let comparison = 0;
+				
+				switch (metadata.sortField) {
+					case "updateDateTime":
+						const aUpdate = a.updateDateTime ? moment(a.updateDateTime).valueOf() : 0;
+						const bUpdate = b.updateDateTime ? moment(b.updateDateTime).valueOf() : 0;
+						comparison = aUpdate - bUpdate;
+						break;
+					case "dueDate":
+						const aDue = a.dueDate ? moment(a.dueDate).valueOf() : Number.MAX_SAFE_INTEGER;
+						const bDue = b.dueDate ? moment(b.dueDate).valueOf() : Number.MAX_SAFE_INTEGER;
+						comparison = aDue - bDue;
+						break;
+					case "title":
+						comparison = a.task.localeCompare(b.task);
+						break;
+					case "timeSpent":
+						const aTime = getTaskTimerDuration(a);
+						const bTime = getTaskTimerDuration(b);
+						comparison = aTime - bTime;
+						break;
+				}
+				
+				return metadata.sortOrder === "asc" ? comparison : -comparison;
+			});
+			
+			return sorted;
+		};
 		
-		// Create tasks
-		tasks.forEach(task => {
-			createTaskElement(task, task.status || "todo", tasksEl);
-		});
+		// Function to sort and render tasks
+		const sortAndRenderTasks = () => {
+			const tasks = tasksByStatus.get(status) || [];
+			const sortedTasks = sortTasks(tasks);
+			
+			// Remove old task elements from the taskElements Map
+			const oldElements = Array.from(tasksEl.children);
+			oldElements.forEach(el => {
+				if (taskElements.has(el as HTMLElement)) {
+					taskElements.delete(el as HTMLElement);
+				}
+			});
+			
+			// Clear existing tasks from DOM
+			tasksEl.empty();
+			
+			// Render sorted tasks
+			sortedTasks.forEach(task => {
+				createTaskElement(task, task.status || "todo", tasksEl);
+			});
+		};
+		
+		// Initial render with sorting
+		sortAndRenderTasks();
 		
 		// Column drop zone handlers
 		setupColumnDropHandlers(tasksEl, status);
