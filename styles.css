@@ -428,7 +428,8 @@
 	font-size: 0.85rem;
 }
 
-.kanban-task-copy-btn {
+.kanban-task-copy-btn,
+.kanban-task-duplicate-btn {
 	background: none;
 	border: none;
 	cursor: pointer;
@@ -443,16 +444,19 @@
 	opacity: 0;
 }
 
-.kanban-task:hover .kanban-task-copy-btn {
+.kanban-task:hover .kanban-task-copy-btn,
+.kanban-task:hover .kanban-task-duplicate-btn {
 	opacity: 1;
 }
 
-.kanban-task-copy-btn:hover {
+.kanban-task-copy-btn:hover,
+.kanban-task-duplicate-btn:hover {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
 
-.kanban-task-copy-btn:active {
+.kanban-task-copy-btn:active,
+.kanban-task-duplicate-btn:active {
 	transform: scale(0.95);
 }
 
@@ -461,10 +465,15 @@
 	opacity: 1 !important;
 }
 
-.kanban-task-copy-btn svg {
+.kanban-task-copy-btn svg,
+.kanban-task-duplicate-btn svg {
 	transition: all 0.2s ease;
 	width: 12px;
 	height: 12px;
+}
+
+.kanban-task-duplicate-btn:hover {
+	color: var(--interactive-accent);
 }
 
 .kanban-task-edit-input {
@@ -1219,5 +1228,69 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .due-date-modal-submit:hover {
+	background-color: var(--interactive-accent-hover);
+}
+
+/* Duplicate Confirmation Modal Styles */
+
+.kanban-duplicate-confirm-modal {
+	padding: 1rem;
+}
+
+.kanban-duplicate-confirm-modal h2 {
+	margin: 0 0 1rem 0;
+	text-align: center;
+}
+
+.kanban-duplicate-confirm-text {
+	margin-bottom: 1rem;
+	color: var(--text-normal);
+	text-align: center;
+}
+
+.kanban-duplicate-task-preview {
+	margin-bottom: 1.5rem;
+	padding: 0.75rem;
+	background-color: var(--background-secondary);
+	border-radius: 6px;
+	border: 1px solid var(--background-modifier-border);
+	font-style: italic;
+	color: var(--text-muted);
+	text-align: center;
+	word-wrap: break-word;
+}
+
+.kanban-duplicate-confirm-buttons {
+	display: flex;
+	gap: 0.5rem;
+	justify-content: flex-end;
+}
+
+.kanban-duplicate-cancel-btn,
+.kanban-duplicate-confirm-btn {
+	padding: 0.6rem 1.2rem;
+	border: none;
+	border-radius: 4px;
+	font-size: 0.9rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.kanban-duplicate-cancel-btn {
+	background-color: var(--background-secondary);
+	color: var(--text-normal);
+}
+
+.kanban-duplicate-cancel-btn:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.kanban-duplicate-confirm-btn {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.kanban-duplicate-confirm-btn:hover {
 	background-color: var(--interactive-accent-hover);
 }

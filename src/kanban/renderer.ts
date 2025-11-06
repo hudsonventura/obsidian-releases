@@ -1,4 +1,4 @@
-import { Plugin, MarkdownPostProcessorContext, App, TFile, moment, Menu, MarkdownRenderer, Component } from "obsidian";
+import { Plugin, MarkdownPostProcessorContext, App, TFile, moment, Menu, MarkdownRenderer, Component, Modal } from "obsidian";
 import { KanbanTask, KanbanData, KanbanStatus, TimerEntry, ColumnState, ColumnMetadata, KanbanView, SortField, SortOrder } from "../types";
 import { TimerEntriesModal } from "./timer-modal";
 import { AddTaskModal } from "./add-task-modal";
@@ -303,6 +303,128 @@ export function renderKanban(
 			} catch (err) {
 				console.error("Kanban: Failed to copy task title:", err);
 			}
+		});
+		
+		// Duplicate button
+		const duplicateBtn = taskHeader.createEl("button", {
+			cls: "kanban-task-duplicate-btn"
+		});
+		duplicateBtn.setAttribute("aria-label", "Duplicate task");
+		
+		// Duplicate icon
+		const duplicateIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		duplicateIcon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+		duplicateIcon.setAttribute("width", "14");
+		duplicateIcon.setAttribute("height", "14");
+		duplicateIcon.setAttribute("viewBox", "0 0 24 24");
+		duplicateIcon.setAttribute("fill", "none");
+		duplicateIcon.setAttribute("stroke", "currentColor");
+		duplicateIcon.setAttribute("stroke-width", "2");
+		duplicateIcon.setAttribute("stroke-linecap", "round");
+		duplicateIcon.setAttribute("stroke-linejoin", "round");
+		duplicateIcon.innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path><line x1="12" y1="12" x2="12" y2="18"></line><line x1="15" y1="15" x2="9" y2="15"></line>';
+		duplicateBtn.appendChild(duplicateIcon);
+		
+		// Duplicate button click handler
+		duplicateBtn.addEventListener("click", async (e) => {
+			e.stopPropagation();
+			
+			// Show confirmation modal
+			const modal = new Menu();
+			
+			// Create a confirmation dialog
+			const confirmed = await new Promise<boolean>((resolve) => {
+				const confirmModal = new class extends Modal {
+					constructor(app: App) {
+						super(app);
+					}
+					
+					onOpen() {
+						const { contentEl } = this;
+						contentEl.empty();
+						contentEl.addClass("kanban-duplicate-confirm-modal");
+						
+						contentEl.createEl("h2", { text: "Duplicate Task?" });
+						contentEl.createEl("p", { 
+							text: `Are you sure you want to duplicate this task?`,
+							cls: "kanban-duplicate-confirm-text"
+						});
+						contentEl.createEl("p", { 
+							text: `"${task.task}"`,
+							cls: "kanban-duplicate-task-preview"
+						});
+						
+						const buttonContainer = contentEl.createDiv("kanban-duplicate-confirm-buttons");
+						
+						const cancelButton = buttonContainer.createEl("button", {
+							text: "Cancel",
+							cls: "kanban-duplicate-cancel-btn"
+						});
+						
+						const confirmButton = buttonContainer.createEl("button", {
+							text: "Duplicate",
+							cls: "kanban-duplicate-confirm-btn"
+						});
+						
+						cancelButton.addEventListener("click", () => {
+							resolve(false);
+							this.close();
+						});
+						
+						confirmButton.addEventListener("click", () => {
+							resolve(true);
+							this.close();
+						});
+					}
+					
+					onClose() {
+						const { contentEl } = this;
+						contentEl.empty();
+					}
+				}(plugin.app);
+				
+				confirmModal.open();
+			});
+			
+			if (!confirmed) {
+				return;
+			}
+			
+			// Create duplicated task
+			const duplicatedTask: KanbanTask = {
+				task: task.task + " (COPY)",
+				status: task.status,
+			};
+			
+			// Copy targetTime if it exists
+			if (task.targetTime) {
+				duplicatedTask.targetTime = task.targetTime;
+			}
+			
+			// Copy tags if they exist
+			if (task.tags && task.tags.length > 0) {
+				duplicatedTask.tags = [...task.tags];
+			}
+			
+			// Copy dueDate if it exists
+			if (task.dueDate) {
+				duplicatedTask.dueDate = task.dueDate;
+			}
+			
+			// Don't copy timerEntries and updateDateTime
+			
+			// Add to tasksByStatus
+			const tasks = tasksByStatus.get(status) || [];
+			tasks.push(duplicatedTask);
+			tasksByStatus.set(status, tasks);
+			
+			// Create and add the new task element to the DOM
+			createTaskElement(duplicatedTask, status, tasksContainer);
+			
+			// Save to file
+			await saveTasksToFile();
+			
+			console.log("Kanban: Task duplicated:", duplicatedTask.task);
 		});
 		
 		// Render task name as markdown to support links
