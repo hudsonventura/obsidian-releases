@@ -161,7 +161,11 @@ export function renderKanban(
 	
 	// Helper function to get column state
 	const getColumnState = (status: KanbanStatus): ColumnState => {
-		const metadata = data.columnMetadata?.find(m => m.name === status);
+		// Try exact match first, then case-insensitive match
+		let metadata = data.columnMetadata?.find(m => m.name === status);
+		if (!metadata) {
+			metadata = data.columnMetadata?.find(m => m.name.toLowerCase() === status.toLowerCase());
+		}
 		return metadata?.state || "todo";
 	};
 	
