@@ -174,6 +174,11 @@ export function renderKanban(
 		data.view = "horizontal";
 	}
 	
+	// Initialize slim mode (default to false - Full View)
+	if (data.slimMode === undefined) {
+		data.slimMode = false;
+	}
+	
 	// Group tasks by status
 	const tasksByStatus = new Map<KanbanStatus, KanbanTask[]>();
 	
@@ -229,6 +234,35 @@ export function renderKanban(
 		await saveViewPreference();
 		
 		console.log("Kanban: View toggled to", data.view);
+	});
+	
+	// Slim mode toggle button
+	const slimModeButton = headerEl.createEl("button", { 
+		cls: "kanban-slim-mode-button"
+	});
+	
+	const updateSlimModeButton = () => {
+		if (data.slimMode) {
+			slimModeButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg><span>Full View</span>`;
+			containerEl.addClass("kanban-slim-mode");
+		} else {
+			slimModeButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line></svg><span>Slim Mode</span>`;
+			containerEl.removeClass("kanban-slim-mode");
+		}
+	};
+	updateSlimModeButton();
+	
+	slimModeButton.addEventListener("click", async () => {
+		// Toggle slim mode
+		data.slimMode = !data.slimMode;
+		
+		// Update button and container class
+		updateSlimModeButton();
+		
+		// Save slim mode preference
+		await saveSlimModePreference();
+		
+		console.log("Kanban: Slim mode toggled to", data.slimMode);
 	});
 	
 	const addStatusButton = headerEl.createEl("button", { 
@@ -1108,7 +1142,8 @@ export function renderKanban(
 			columns: data.columns,
 			columnMetadata: data.columnMetadata,
 			collapsedColumns: data.collapsedColumns,
-			view: data.view
+			view: data.view,
+			slimMode: data.slimMode
 		}).catch(err => {
 			console.error("Error saving tasks to file:", err);
 		});
@@ -1158,7 +1193,8 @@ export function renderKanban(
 			columns: data.columns,
 			columnMetadata: data.columnMetadata,
 			collapsedColumns: data.collapsedColumns,
-			view: data.view
+			view: data.view,
+			slimMode: data.slimMode
 		}).catch(err => {
 			console.error("Error saving collapsed state to file:", err);
 		});
@@ -1207,9 +1243,60 @@ export function renderKanban(
 			columns: data.columns,
 			columnMetadata: data.columnMetadata,
 			collapsedColumns: data.collapsedColumns,
-			view: data.view
+			view: data.view,
+			slimMode: data.slimMode
 		}).catch(err => {
 			console.error("Error saving view preference to file:", err);
+		});
+	}
+	
+	async function saveSlimModePreference() {
+		const allTasks: KanbanTask[] = [];
+		taskElements.forEach((info) => {
+			const taskData: KanbanTask = { 
+				task: info.task.task, 
+				status: info.status
+			};
+			
+			// Include target time if it exists
+			if (info.task.targetTime) {
+				taskData.targetTime = info.task.targetTime;
+			}
+			
+			// Include timer entries if they exist
+			if (info.task.timerEntries && info.task.timerEntries.length > 0) {
+				taskData.timerEntries = info.task.timerEntries;
+			}
+			
+			// Include tags if they exist
+			if (info.task.tags && info.task.tags.length > 0) {
+				taskData.tags = info.task.tags;
+			}
+			
+			// Include due date if it exists
+			if (info.task.dueDate) {
+				taskData.dueDate = info.task.dueDate;
+			}
+			
+			// Include update datetime if it exists
+			if (info.task.updateDateTime) {
+				taskData.updateDateTime = info.task.updateDateTime;
+			}
+			
+			allTasks.push(taskData);
+		});
+		
+		console.log("Kanban: Saving slim mode preference:", data.slimMode);
+		
+		await updateKanbanInFile(plugin.app, ctx, "", "todo" as KanbanStatus, originalSource, { 
+			tasks: allTasks, 
+			columns: data.columns,
+			columnMetadata: data.columnMetadata,
+			collapsedColumns: data.collapsedColumns,
+			view: data.view,
+			slimMode: data.slimMode
+		}).catch(err => {
+			console.error("Error saving slim mode preference to file:", err);
 		});
 	}
 	

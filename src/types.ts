@@ -35,5 +35,6 @@ export interface KanbanData {
 	columnMetadata?: ColumnMetadata[]; // Metadata for columns including their state
 	collapsedColumns?: string[]; // Array of column names that are collapsed
 	view?: KanbanView; // View mode: horizontal (statuses stacked) or vertical (statuses side-by-side)
+	slimMode?: boolean; // Slim mode: only show task title
 }
 
