@@ -287,6 +287,46 @@ export function renderKanban(
 		console.log("Kanban: Slim mode toggled to", data.slimMode);
 	});
 	
+	// Filter input
+	const filterContainer = headerEl.createDiv("kanban-filter-container");
+	const filterIcon = filterContainer.createEl("span", { 
+		cls: "kanban-filter-icon",
+		text: "🔍"
+	});
+	const filterInput = filterContainer.createEl("input", {
+		cls: "kanban-filter-input",
+		attr: {
+			type: "text",
+			placeholder: "Filter tasks...",
+			"aria-label": "Filter tasks"
+		}
+	});
+	
+	// Filter state
+	let filterText = "";
+	
+	// Filter input handler
+	filterInput.addEventListener("input", () => {
+		filterText = filterInput.value.toLowerCase().trim();
+		applyFilter();
+	});
+	
+	// Function to apply filter
+	const applyFilter = () => {
+		const allTaskElements = containerEl.querySelectorAll(".kanban-task, .kanban-table-row");
+		
+		allTaskElements.forEach((taskEl) => {
+			const taskElement = taskEl as HTMLElement;
+			const taskTitle = taskElement.getAttribute("data-task-title")?.toLowerCase() || "";
+			
+			if (filterText === "" || taskTitle.includes(filterText)) {
+				taskElement.style.display = "";
+			} else {
+				taskElement.style.display = "none";
+			}
+		});
+	};
+	
 	const addStatusButton = headerEl.createEl("button", { 
 		cls: "kanban-add-status-button",
 		text: "+ Add Status"
@@ -311,6 +351,7 @@ export function renderKanban(
 		const taskEl = tasksContainer.createDiv("kanban-task");
 		taskEl.setAttr("draggable", "true");
 		taskEl.setAttr("data-task", task.task);
+		taskEl.setAttr("data-task-title", task.task); // For filtering
 		taskEl.setAttr("data-status", status);
 		taskEl.classList.add("kanban-task-draggable");
 		
@@ -1418,9 +1459,13 @@ export function renderKanban(
 	if (data.view === "table") {
 		// TABLE VIEW: Render as table with status sections
 		renderTableView();
+		// Apply filter after rendering
+		setTimeout(() => applyFilter(), 0);
 	} else {
 		// KANBAN VIEW: Render traditional kanban columns
 		renderKanbanColumns();
+		// Apply filter after rendering
+		setTimeout(() => applyFilter(), 0);
 	}
 	
 	// Function to render table view
@@ -1553,6 +1598,7 @@ export function renderKanban(
 					
 					// Re-render table view
 					renderTableView();
+					setTimeout(() => applyFilter(), 0);
 					saveCollapsedState();
 				});
 			}
@@ -1661,6 +1707,7 @@ export function renderKanban(
 				const row = tbody.createEl("tr", { cls: "kanban-table-row" });
 				row.setAttr("draggable", "true");
 				row.setAttr("data-task", task.task);
+				row.setAttr("data-task-title", task.task); // For filtering
 				row.setAttr("data-status", status);
 				
 				// Add running class if timer is active
@@ -1777,11 +1824,12 @@ export function renderKanban(
 									
 									// Remove from taskElements
 									taskElements.delete(row);
-									
-									// Re-render table view
-									renderTableView();
-									
-									// Save changes
+								
+								// Re-render table view
+								renderTableView();
+								setTimeout(() => applyFilter(), 0);
+								
+								// Save changes
 									await saveTasksToFile(task.task);
 									
 									console.log("Kanban: Changed task status from", status, "to", targetStatus);
@@ -2047,10 +2095,11 @@ export function renderKanban(
 								plugin.app,
 								task.tags || [],
 								async (tagsArray) => {
-									if (tagsArray === null) return;
-									task.tags = tagsArray.length > 0 ? tagsArray : undefined;
-									renderTableView();
-									await saveTasksToFile(task.task);
+								if (tagsArray === null) return;
+								task.tags = tagsArray.length > 0 ? tagsArray : undefined;
+								renderTableView();
+								setTimeout(() => applyFilter(), 0);
+								await saveTasksToFile(task.task);
 								}
 							);
 							modal.open();
@@ -2066,10 +2115,11 @@ export function renderKanban(
 									if (newDate === null) {
 										task.dueDate = undefined;
 									} else {
-										task.dueDate = newDate;
-									}
-									renderTableView();
-									await saveTasksToFile(task.task);
+									task.dueDate = newDate;
+								}
+								renderTableView();
+								setTimeout(() => applyFilter(), 0);
+								await saveTasksToFile(task.task);
 								}
 							);
 							modal.open();
@@ -2243,10 +2293,11 @@ export function renderKanban(
 					
 					// Don't do anything if dropping on itself
 					if (targetTaskName === taskText) {
-						console.log("Kanban: Dropped task on itself, ignoring");
-						draggedOverRow = null;
-						renderTableView();
-						return;
+					console.log("Kanban: Dropped task on itself, ignoring");
+					draggedOverRow = null;
+					renderTableView();
+					setTimeout(() => applyFilter(), 0);
+					return;
 					}
 					
 					const statusTasks = tasksByStatus.get(status) || [];
@@ -2313,11 +2364,12 @@ export function renderKanban(
 				
 				// Reset
 				draggedOverRow = null;
-				
-				// Re-render the table view to show the updated order
-				renderTableView();
-				
-				// Save changes
+			
+			// Re-render the table view to show the updated order
+			renderTableView();
+			setTimeout(() => applyFilter(), 0);
+			
+			// Save changes
 				await saveTasksToFile(taskText);
 			});
 		});

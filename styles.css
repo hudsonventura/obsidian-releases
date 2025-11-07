@@ -1303,6 +1303,47 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	flex-shrink: 0;
 }
 
+/* Filter input */
+.kanban-filter-container {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	padding: 0.4rem 0.8rem;
+	flex: 1;
+	max-width: 300px;
+	transition: all 0.2s ease;
+}
+
+.kanban-filter-container:focus-within {
+	border-color: var(--interactive-accent);
+	background-color: var(--background-primary);
+}
+
+.kanban-filter-icon {
+	font-size: 0.9rem;
+	opacity: 0.6;
+	flex-shrink: 0;
+}
+
+.kanban-filter-input {
+	flex: 1;
+	border: none;
+	background: transparent;
+	color: var(--text-normal);
+	font-size: 0.9rem;
+	outline: none;
+	padding: 0;
+	min-width: 0;
+}
+
+.kanban-filter-input::placeholder {
+	color: var(--text-muted);
+	opacity: 0.6;
+}
+
 /* Slim Mode: Hide all information except task title and target time/due date row */
 .kanban-slim-mode .kanban-task-tags {
 	display: none !important;

@@ -46,6 +46,15 @@ The table displays the following columns for each task:
 - Minimum column width is 50px to maintain usability
 - Resize handle appears on hover at the right edge of column headers
 
+#### Task Filtering
+
+- **Search box** in the header allows filtering tasks by title
+- Type any text to instantly filter tasks across all views (horizontal, vertical, table)
+- Filter is case-insensitive and searches within task titles
+- Tasks that don't match are hidden automatically
+- Clear the filter to show all tasks again
+- Filter persists while navigating between views
+
 #### Visual Indicators
 
 - **Date format**: All dates displayed as "ddd, YYYY-MM-DD HH:mm" (e.g., "Mon, 2025-11-07 14:30")
