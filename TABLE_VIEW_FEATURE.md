@@ -61,12 +61,13 @@ The table displays the following columns for each task:
 - **Overdue tasks**: Red text for past-due dates
 - **Soon tasks**: Orange text for tasks due within 24 hours
 - **Running timers**: Blue animated text for active time tracking
-- **Progress bar colors**:
-  - 🟢 Green: 0-69% complete
-  - 🟡 Yellow: 70-84% complete
-  - 🟠 Orange: 85-99% complete
-  - 🔴 Red: 100%+ over target
+- **Progress bar colors** (customizable in settings):
+  - 🟢 Green: 0-69% complete (default)
+  - 🟡 Yellow: 70-84% complete (default)
+  - 🟠 Orange: 85-99% complete (default)
+  - 🔴 Red: 100%+ over target (default)
   - Animated pulse effect when timer is running
+  - Thresholds can be customized in plugin settings
 - **Status emojis**: 
   - ▶️ for "In Progress" states
   - ✅ for "Done" states
@@ -158,6 +159,27 @@ The columns provide comprehensive task information:
 - Time Spent (displays as "spent / target" for easy progress comparison)
 - Progress (visual progress bar with percentage when target time is set)
 - Actions (timer control buttons for starting/stopping time tracking)
+
+## Settings
+
+### Progress Bar Color Thresholds
+
+You can customize the progress bar colors to match your workflow preferences:
+
+1. Open Obsidian **Settings** → **Community plugins** → **Kanban Plugin**
+2. Adjust the threshold percentages for each color:
+   - **Green threshold**: Maximum percentage for green color (default: 69%)
+   - **Yellow threshold**: Maximum percentage for yellow color (default: 84%)
+   - **Orange threshold**: Maximum percentage for orange color (default: 99%)
+   - **Red threshold**: Minimum percentage for red color (default: 100%)
+
+**Example custom configuration:**
+- Set green to 79% for more lenient early progress
+- Set yellow to 89% to narrow the "approaching deadline" range
+- Set orange to 95% to give more warning before going over
+- Set red to 100% to highlight tasks that exceed their target time
+
+Settings apply immediately to all progress bars across all three views (horizontal, vertical, table).
 
 ## Future Enhancements
 
