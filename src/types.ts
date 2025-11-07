@@ -27,7 +27,7 @@ export interface KanbanTask {
 	updateDateTime?: string; // Last update date/time (ISO string format)
 }
 
-export type KanbanView = "horizontal" | "vertical";
+export type KanbanView = "horizontal" | "vertical" | "table";
 
 export interface KanbanData {
 	tasks?: KanbanTask[];

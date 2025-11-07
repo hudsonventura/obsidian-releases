@@ -213,6 +213,8 @@ export function renderKanban(
 	const updateViewButton = () => {
 		if (data.view === "horizontal") {
 			viewToggleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg><span>Vertical View</span>`;
+		} else if (data.view === "vertical") {
+			viewToggleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="4"></rect><rect x="3" y="10" width="18" height="4"></rect><rect x="3" y="17" width="18" height="4"></rect></svg><span>Table View</span>`;
 		} else {
 			viewToggleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg><span>Horizontal View</span>`;
 		}
@@ -220,14 +222,20 @@ export function renderKanban(
 	updateViewButton();
 	
 	viewToggleButton.addEventListener("click", async () => {
-		// Toggle view
-		data.view = data.view === "horizontal" ? "vertical" : "horizontal";
+		// Toggle view: horizontal -> vertical -> table -> horizontal
+		if (data.view === "horizontal") {
+			data.view = "vertical";
+		} else if (data.view === "vertical") {
+			data.view = "table";
+		} else {
+			data.view = "horizontal";
+		}
 		
 		// Update button
 		updateViewButton();
 		
 		// Update board classes
-		boardEl.removeClass("kanban-board-horizontal", "kanban-board-vertical");
+		boardEl.removeClass("kanban-board-horizontal", "kanban-board-vertical", "kanban-board-table");
 		boardEl.addClass(`kanban-board-${data.view}`);
 		
 		// Save view preference
@@ -1392,6 +1400,497 @@ export function renderKanban(
 		modal.open();
 	});
 	
+	// Render based on view mode
+	if (data.view === "table") {
+		// TABLE VIEW: Render as table with status sections
+		renderTableView();
+	} else {
+		// KANBAN VIEW: Render traditional kanban columns
+		renderKanbanColumns();
+	}
+	
+	// Function to render table view
+	function renderTableView() {
+		boardEl.empty();
+		
+		// Clear taskElements map for table view entries
+		const currentTasks = new Map<string, KanbanTask>();
+		taskElements.forEach((info, el) => {
+			// Save task data by task name
+			currentTasks.set(info.task.task, info.task);
+		});
+		taskElements.clear();
+		
+		// Create table container
+		const tableContainer = boardEl.createDiv("kanban-table-container");
+		
+		// Render each status as a section
+		statusColumns.forEach(status => {
+			const displayName = statusToDisplayName(status);
+			// Get tasks from either tasksByStatus or currentTasks
+			let tasks = tasksByStatus.get(status) || [];
+			
+			// If we're re-rendering, merge with current tasks
+			if (currentTasks.size > 0) {
+				const allTasks = new Map<string, KanbanTask>();
+				
+				// Add tasks from tasksByStatus
+				tasks.forEach(task => {
+					allTasks.set(task.task, task);
+				});
+				
+				// Update with latest data from currentTasks
+				currentTasks.forEach((task, taskName) => {
+					if (task.status === status) {
+						allTasks.set(taskName, task);
+					}
+				});
+				
+				tasks = Array.from(allTasks.values());
+			}
+			
+			// Create status section
+			const statusSection = tableContainer.createDiv("kanban-table-section");
+			statusSection.setAttr("data-status", status);
+			
+			// Section header
+			const sectionHeader = statusSection.createDiv("kanban-table-section-header");
+			
+			// Collapse button
+			const collapseBtn = sectionHeader.createEl("button", {
+				cls: "kanban-table-collapse-btn"
+			});
+			const chevronIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+			chevronIcon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+			chevronIcon.setAttribute("width", "16");
+			chevronIcon.setAttribute("height", "16");
+			chevronIcon.setAttribute("viewBox", "0 0 24 24");
+			chevronIcon.setAttribute("fill", "none");
+			chevronIcon.setAttribute("stroke", "currentColor");
+			chevronIcon.setAttribute("stroke-width", "2");
+			chevronIcon.setAttribute("stroke-linecap", "round");
+			chevronIcon.setAttribute("stroke-linejoin", "round");
+			chevronIcon.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
+			collapseBtn.appendChild(chevronIcon);
+			
+			const sectionTitle = sectionHeader.createEl("h3", { cls: "kanban-table-section-title" });
+			const columnState = getColumnState(status);
+			const stateEmoji = columnState === "in-progress" ? "▶️ " : columnState === "done" ? "✅ " : "";
+			sectionTitle.setText(stateEmoji + displayName);
+			
+			const taskCount = sectionHeader.createEl("span", {
+				cls: "kanban-table-task-count",
+				text: `${tasks.length}`
+			});
+			
+			// Create table
+			const table = statusSection.createEl("table", { cls: "kanban-table" });
+			const thead = table.createEl("thead");
+			const headerRow = thead.createEl("tr");
+			
+			// Table headers with sorting
+			const headers = [
+				{ label: "Name", field: "title" as SortField },
+				{ label: "Due Date", field: "dueDate" as SortField },
+				{ label: "Time Spent", field: "timeSpent" as SortField },
+				{ label: "Last Updated", field: "updateDateTime" as SortField }
+			];
+			
+			headers.forEach(header => {
+				const th = headerRow.createEl("th");
+				th.setText(header.label);
+				if (header.field) {
+					th.addClass("sortable");
+					th.addEventListener("click", () => {
+						// Get or create column metadata
+						let metadata = data.columnMetadata?.find(m => m.name === status);
+						if (!metadata) {
+							metadata = { name: status, state: columnState, sortField: "updateDateTime", sortOrder: "desc" };
+							if (!data.columnMetadata) data.columnMetadata = [];
+							data.columnMetadata.push(metadata);
+						}
+						
+						// Toggle sort
+						if (metadata.sortField === header.field) {
+							metadata.sortOrder = metadata.sortOrder === "asc" ? "desc" : "asc";
+						} else {
+							metadata.sortField = header.field;
+							metadata.sortOrder = "asc";
+						}
+						
+						// Re-render table view
+						renderTableView();
+						saveCollapsedState();
+					});
+				}
+			});
+			
+			// Table body
+			const tbody = table.createEl("tbody");
+			
+			// Sort tasks
+			const getColumnMetadata = () => {
+				let metadata = data.columnMetadata?.find(m => m.name === status);
+				if (!metadata) {
+					metadata = { name: status, state: columnState, sortField: "updateDateTime", sortOrder: "desc" };
+					if (!data.columnMetadata) data.columnMetadata = [];
+					data.columnMetadata.push(metadata);
+				}
+				if (!metadata.sortField) metadata.sortField = "updateDateTime";
+				if (!metadata.sortOrder) metadata.sortOrder = "desc";
+				return metadata;
+			};
+			
+			const sortTasks = (tasks: KanbanTask[]): KanbanTask[] => {
+				const metadata = getColumnMetadata();
+				const sorted = [...tasks];
+				
+				sorted.sort((a, b) => {
+					let comparison = 0;
+					
+					switch (metadata.sortField) {
+						case "updateDateTime":
+							const aUpdate = a.updateDateTime ? moment(a.updateDateTime).valueOf() : 0;
+							const bUpdate = b.updateDateTime ? moment(b.updateDateTime).valueOf() : 0;
+							comparison = aUpdate - bUpdate;
+							break;
+						case "dueDate":
+							const aDue = a.dueDate ? moment(a.dueDate).valueOf() : Number.MAX_SAFE_INTEGER;
+							const bDue = b.dueDate ? moment(b.dueDate).valueOf() : Number.MAX_SAFE_INTEGER;
+							comparison = aDue - bDue;
+							break;
+						case "title":
+							comparison = a.task.localeCompare(b.task);
+							break;
+						case "timeSpent":
+							const aTime = getTaskTimerDuration(a);
+							const bTime = getTaskTimerDuration(b);
+							comparison = aTime - bTime;
+							break;
+					}
+					
+					return metadata.sortOrder === "asc" ? comparison : -comparison;
+				});
+				
+				return sorted;
+			};
+			
+			const sortedTasks = sortTasks(tasks);
+			
+			// Render task rows
+			sortedTasks.forEach(task => {
+				const row = tbody.createEl("tr", { cls: "kanban-table-row" });
+				row.setAttr("draggable", "true");
+				row.setAttr("data-task", task.task);
+				row.setAttr("data-status", status);
+				
+				// Store task element mapping
+				taskElements.set(row, { task, status });
+				
+				// Set up drag handlers
+				setupTaskDragHandlers(row, status);
+				
+				// Task name cell with inline tags
+				const nameCell = row.createEl("td", { cls: "kanban-table-cell-name" });
+				MarkdownRenderer.render(
+					plugin.app,
+					task.task,
+					nameCell,
+					ctx.sourcePath,
+					component
+				).then(() => {
+					const paragraph = nameCell.querySelector("p");
+					if (paragraph) {
+						while (paragraph.firstChild) {
+							nameCell.appendChild(paragraph.firstChild);
+						}
+						paragraph.remove();
+					}
+					
+					// Add tags inline after the task name
+					if (task.tags && task.tags.length > 0) {
+						task.tags.forEach(tag => {
+							const tagEl = nameCell.createSpan("kanban-tag");
+							tagEl.setText(tag);
+						});
+					}
+				});
+				
+				// Due date cell
+				const dueDateCell = row.createEl("td", { cls: "kanban-table-cell-due-date" });
+				if (task.dueDate) {
+					const dueDate = moment(task.dueDate);
+					const now = moment();
+					dueDateCell.setText(dueDate.format("MMM D, YYYY HH:mm"));
+					
+					if (dueDate.isBefore(now)) {
+						dueDateCell.addClass("overdue");
+					} else if (dueDate.diff(now, "hours") <= 24) {
+						dueDateCell.addClass("soon");
+					}
+				} else {
+					dueDateCell.setText("—");
+				}
+				
+				// Time spent cell
+				const timeSpentCell = row.createEl("td", { cls: "kanban-table-cell-time-spent" });
+				const totalDuration = getTaskTimerDuration(task);
+				if (totalDuration > 0) {
+					timeSpentCell.setText(formatTimerDuration(totalDuration));
+					if (isTaskTimerRunning(task)) {
+						timeSpentCell.addClass("running");
+					}
+				} else {
+					timeSpentCell.setText("—");
+				}
+				
+				// Last updated cell
+				const updatedCell = row.createEl("td", { cls: "kanban-table-cell-updated" });
+				if (task.updateDateTime) {
+					const updateDate = moment(task.updateDateTime);
+					updatedCell.setText(updateDate.format("MMM D, YYYY HH:mm"));
+				} else {
+					updatedCell.setText("—");
+				}
+				
+				// Row context menu
+				row.addEventListener("contextmenu", (e) => {
+					e.preventDefault();
+					const menu = new Menu();
+					
+					menu.addItem((item) => {
+						item.setTitle("Edit Tags").setIcon("tag").onClick(() => {
+							const modal = new EditTagsModal(
+								plugin.app,
+								task.tags || [],
+								async (tagsArray) => {
+									if (tagsArray === null) return;
+									task.tags = tagsArray.length > 0 ? tagsArray : undefined;
+									renderTableView();
+									await saveTasksToFile(task.task);
+								}
+							);
+							modal.open();
+						});
+					});
+					
+					menu.addItem((item) => {
+						item.setTitle("Edit Due Date").setIcon("calendar").onClick(() => {
+							const modal = new DueDateModal(
+								plugin.app,
+								task.dueDate,
+								async (newDate) => {
+									if (newDate === null) {
+										task.dueDate = undefined;
+									} else {
+										task.dueDate = newDate;
+									}
+									renderTableView();
+									await saveTasksToFile(task.task);
+								}
+							);
+							modal.open();
+						});
+					});
+					
+					menu.addSeparator();
+					
+					menu.addItem((item) => {
+						item.setTitle("Delete Task").setIcon("trash").onClick(async () => {
+							taskElements.delete(row);
+							row.remove();
+							await saveTasksToFile();
+						});
+					});
+					
+					menu.showAtMouseEvent(e);
+				});
+			});
+			
+			// Collapse functionality
+			const collapsedColumns = data.collapsedColumns || [];
+			let isCollapsed = collapsedColumns.includes(status);
+			
+			if (isCollapsed) {
+				statusSection.addClass("collapsed");
+				table.style.display = "none";
+			}
+			
+			collapseBtn.addEventListener("click", async () => {
+				isCollapsed = !isCollapsed;
+				
+				if (isCollapsed) {
+					statusSection.addClass("collapsed");
+					table.style.display = "none";
+					chevronIcon.innerHTML = '<polyline points="9 18 15 12 9 6"></polyline>';
+					
+					if (!data.collapsedColumns) data.collapsedColumns = [];
+					if (!data.collapsedColumns.includes(status)) {
+						data.collapsedColumns.push(status);
+					}
+				} else {
+					statusSection.removeClass("collapsed");
+					table.style.display = "table";
+					chevronIcon.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
+					
+					if (data.collapsedColumns) {
+						data.collapsedColumns = data.collapsedColumns.filter(col => col !== status);
+					}
+				}
+				
+				await saveCollapsedState();
+			});
+			
+			// Set up drop handlers for table view - support both reordering and moving between statuses
+			let draggedOverRow: HTMLElement | null = null;
+			let insertBefore = true;
+			
+			tbody.addEventListener("dragover", (e: DragEvent) => {
+				e.preventDefault();
+				if (!e.dataTransfer) return;
+				e.dataTransfer.dropEffect = "move";
+				
+				// Find the row being dragged over
+				const target = e.target as HTMLElement;
+				const row = target.closest("tr.kanban-table-row") as HTMLElement;
+				
+				if (row && row.parentElement === tbody) {
+					// Remove previous indicators
+					tbody.querySelectorAll(".kanban-table-drop-indicator").forEach(el => el.remove());
+					
+					// Determine if we should insert before or after based on mouse position
+					const rect = row.getBoundingClientRect();
+					const midpoint = rect.top + rect.height / 2;
+					insertBefore = e.clientY < midpoint;
+					
+					// Add visual indicator
+					const indicator = document.createElement("tr");
+					indicator.className = "kanban-table-drop-indicator";
+					const td = indicator.createEl("td");
+					td.setAttribute("colspan", "4");
+					
+					if (insertBefore) {
+						row.parentElement?.insertBefore(indicator, row);
+					} else {
+						row.parentElement?.insertBefore(indicator, row.nextSibling);
+					}
+					
+					draggedOverRow = row;
+				} else {
+					statusSection.addClass("kanban-table-drag-over");
+				}
+			});
+			
+			tbody.addEventListener("dragleave", (e: DragEvent) => {
+				if (!tbody.contains(e.relatedTarget as Node)) {
+					statusSection.removeClass("kanban-table-drag-over");
+					tbody.querySelectorAll(".kanban-table-drop-indicator").forEach(el => el.remove());
+					draggedOverRow = null;
+				}
+			});
+			
+			tbody.addEventListener("drop", async (e: DragEvent) => {
+				e.preventDefault();
+				if (!e.dataTransfer) return;
+				
+				// Clean up visual indicators
+				statusSection.removeClass("kanban-table-drag-over");
+				tbody.querySelectorAll(".kanban-table-drop-indicator").forEach(el => el.remove());
+				
+				const sourceStatus = e.dataTransfer.getData("application/x-kanban-status") as KanbanStatus;
+				const taskText = e.dataTransfer.getData("text/plain");
+				
+				// Find the task
+				let movedTask: { task: KanbanTask; status: KanbanStatus } | undefined;
+				let movedTaskEl: HTMLElement | undefined;
+				
+				taskElements.forEach((info, el) => {
+					if (info.task.task === taskText && info.status === sourceStatus) {
+						movedTask = info;
+						movedTaskEl = el;
+					}
+				});
+				
+				if (!movedTask || !movedTaskEl) return;
+				
+				// Remove the old element from DOM and taskElements
+				taskElements.delete(movedTaskEl);
+				movedTaskEl.remove();
+				
+				// Update task status
+				movedTask.task.status = status;
+				movedTask.task.updateDateTime = moment().toISOString();
+				movedTask.status = status;
+				
+				// Handle reordering within same status or moving to different status
+				if (sourceStatus === status && draggedOverRow) {
+					// Reordering within same status
+					const targetTaskName = draggedOverRow.getAttribute("data-task");
+					const statusTasks = tasksByStatus.get(status) || [];
+					
+					// Remove the moved task from its current position
+					const filteredTasks = statusTasks.filter(t => t.task !== taskText);
+					
+					// Find the target index
+					const targetIndex = filteredTasks.findIndex(t => t.task === targetTaskName);
+					
+					if (targetIndex >= 0) {
+						// Insert at the correct position
+						const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
+						filteredTasks.splice(insertIndex, 0, movedTask.task);
+						tasksByStatus.set(status, filteredTasks);
+					} else {
+						// Fallback: add at the end
+						filteredTasks.push(movedTask.task);
+						tasksByStatus.set(status, filteredTasks);
+					}
+					
+					console.log("Kanban: Reordered task", taskText, "within", status);
+				} else {
+					// Moving to different status
+					const oldStatusTasks = tasksByStatus.get(sourceStatus) || [];
+					const filteredOldTasks = oldStatusTasks.filter(t => t.task !== taskText);
+					tasksByStatus.set(sourceStatus, filteredOldTasks);
+					
+					const newStatusTasks = tasksByStatus.get(status) || [];
+					
+					if (draggedOverRow) {
+						// Insert at specific position
+						const targetTaskName = draggedOverRow.getAttribute("data-task");
+						const targetIndex = newStatusTasks.findIndex(t => t.task === targetTaskName);
+						
+						if (targetIndex >= 0) {
+							const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
+							newStatusTasks.splice(insertIndex, 0, movedTask.task);
+						} else {
+							newStatusTasks.push(movedTask.task);
+						}
+					} else {
+						// Add at the end if no specific position
+						if (!newStatusTasks.find(t => t.task === taskText)) {
+							newStatusTasks.push(movedTask.task);
+						}
+					}
+					
+					tasksByStatus.set(status, newStatusTasks);
+					
+					console.log("Kanban: Moved task", taskText, "from", sourceStatus, "to", status);
+				}
+				
+				// Reset
+				draggedOverRow = null;
+				
+				// Re-render the table view to show the updated order
+				renderTableView();
+				
+				// Save changes
+				await saveTasksToFile(taskText);
+			});
+		});
+	}
+	
+	// Function to render kanban columns (original logic)
+	function renderKanbanColumns() {
 	statusColumns.forEach(status => {
 		const displayName = statusToDisplayName(status);
 		const columnEl = boardEl.createDiv("kanban-column");
@@ -1710,6 +2209,7 @@ export function renderKanban(
 		// Column drop zone handlers
 		setupColumnDropHandlers(tasksEl, status);
 	});
+	}
 	
 	// Set up drag handlers for tasks
 	function setupTaskDragHandlers(taskEl: HTMLElement, sourceStatus: KanbanStatus) {

@@ -1301,3 +1301,266 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 .kanban-slim-mode .kanban-task-due-date {
 	display: flex !important;
 }
+
+/* Table View Styles */
+
+.kanban-board-table {
+	display: block;
+	width: 100%;
+	overflow-x: auto;
+	padding: 0.5rem 0;
+}
+
+.kanban-table-container {
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+}
+
+.kanban-table-section {
+	background-color: var(--background-secondary);
+	border-radius: 8px;
+	padding: 1rem;
+	overflow: hidden;
+}
+
+.kanban-table-section.collapsed {
+	padding-bottom: 0.5rem;
+}
+
+.kanban-table-section-header {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-bottom: 1rem;
+	padding-bottom: 0.75rem;
+	border-bottom: 2px solid var(--background-modifier-border);
+}
+
+.kanban-table-collapse-btn {
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 0.25rem;
+	border-radius: 4px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	transition: all 0.2s ease;
+	flex-shrink: 0;
+}
+
+.kanban-table-collapse-btn:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.kanban-table-section-title {
+	margin: 0;
+	font-size: 1.1rem;
+	font-weight: 600;
+	color: var(--text-normal);
+	flex: 1;
+}
+
+.kanban-table-task-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 24px;
+	height: 24px;
+	padding: 0.25rem 0.5rem;
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-radius: 12px;
+	font-size: 0.75rem;
+	font-weight: 600;
+}
+
+.kanban-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.7rem;
+	background-color: var(--background-primary);
+	border-radius: 6px;
+	overflow: hidden;
+}
+
+.kanban-table thead {
+	background-color: var(--background-modifier-border);
+}
+
+.kanban-table th {
+	text-align: left;
+	padding: 0.35rem 0.6rem;
+	font-weight: 600;
+	color: var(--text-normal);
+	border-bottom: 2px solid var(--background-modifier-border);
+	position: sticky;
+	top: 0;
+	background-color: var(--background-modifier-border);
+	z-index: 1;
+	line-height: 1.1;
+	font-size: 0.7rem;
+}
+
+.kanban-table th.sortable {
+	cursor: pointer;
+	user-select: none;
+	transition: background-color 0.2s ease;
+}
+
+.kanban-table th.sortable:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.kanban-table tbody tr {
+	border-bottom: 1px solid transparent;
+	transition: all 0.2s ease;
+}
+
+.kanban-table tbody tr:hover {
+	background-color: var(--background-modifier-hover);
+	border-bottom-color: var(--background-modifier-border);
+}
+
+.kanban-table td {
+	padding: 0.3rem 0.6rem;
+	color: var(--text-normal);
+	vertical-align: middle;
+	border: none;
+	line-height: 1.2;
+}
+
+/* No vertical borders - only horizontal */
+.kanban-table th,
+.kanban-table td {
+	border-left: none;
+	border-right: none;
+}
+
+.kanban-table-cell-name {
+	font-weight: 500;
+	max-width: 500px;
+	word-wrap: break-word;
+}
+
+.kanban-table-cell-name .kanban-tag {
+	margin-left: 0.35rem;
+	display: inline-flex;
+	vertical-align: middle;
+}
+
+.kanban-table-cell-tags {
+	min-width: 120px;
+}
+
+.kanban-table-cell-tags .kanban-tag {
+	margin-right: 0.25rem;
+	margin-bottom: 0.25rem;
+	font-size: 0.6rem;
+	padding: 0.08rem 0.35rem;
+}
+
+.kanban-table-cell-due-date,
+.kanban-table-cell-updated {
+	white-space: nowrap;
+	font-size: 0.65rem;
+	color: var(--text-muted);
+	min-width: 130px;
+}
+
+.kanban-table-cell-due-date.overdue {
+	color: var(--text-error);
+	font-weight: 600;
+}
+
+.kanban-table-cell-due-date.soon {
+	color: var(--color-orange);
+	font-weight: 600;
+}
+
+.kanban-table-cell-time-spent {
+	font-family: var(--font-monospace);
+	font-size: 0.65rem;
+	white-space: nowrap;
+	min-width: 85px;
+}
+
+.kanban-table-cell-time-spent.running {
+	color: var(--interactive-accent);
+	font-weight: 600;
+	animation: timer-blink 2s ease-in-out infinite;
+}
+
+@keyframes timer-blink {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.6;
+	}
+}
+
+.kanban-table-row {
+	cursor: grab;
+	user-select: none;
+}
+
+.kanban-table-row:active {
+	cursor: grabbing;
+}
+
+.kanban-table-row.kanban-task-dragging {
+	opacity: 0.5;
+}
+
+.kanban-table-drag-over {
+	background-color: var(--background-modifier-hover);
+	outline: 2px dashed var(--interactive-accent);
+	outline-offset: -2px;
+}
+
+.kanban-table-drop-indicator {
+	height: 3px;
+	background: none;
+	pointer-events: none;
+}
+
+.kanban-table-drop-indicator td {
+	padding: 0;
+	height: 3px;
+	border-top: 3px solid var(--interactive-accent);
+	background: none;
+	position: relative;
+}
+
+.kanban-table-drop-indicator td::before {
+	content: '';
+	position: absolute;
+	left: -6px;
+	top: -6px;
+	width: 12px;
+	height: 12px;
+	background-color: var(--interactive-accent);
+	border-radius: 50%;
+	box-shadow: 0 0 4px var(--interactive-accent);
+}
+
+/* Responsive table view */
+@media (max-width: 1024px) {
+	.kanban-table {
+		font-size: 0.65rem;
+	}
+	
+	.kanban-table th,
+	.kanban-table td {
+		padding: 0.25rem 0.4rem;
+	}
+	
+	.kanban-table-cell-name {
+		max-width: 250px;
+	}
+}
