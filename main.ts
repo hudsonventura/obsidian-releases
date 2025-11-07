@@ -96,6 +96,52 @@ class KanbanSettingTab extends PluginSettingTab {
 
 		containerEl.createEl('h2', { text: 'Kanban Plugin Settings' });
 		
+		// Inspiring message
+		const messageContainer = containerEl.createDiv({ cls: 'kanban-settings-message' });
+		messageContainer.createEl('p', { 
+			text: '✨ Thank you for using Kanban Plugin! ✨',
+			attr: { style: 'font-size: 1.1rem; font-weight: 600; color: var(--interactive-accent); margin-bottom: 0.5rem;' }
+		});
+		messageContainer.createEl('p', { 
+			text: 'Stay focused, track your progress, and achieve your goals one task at a time. Remember: small consistent steps lead to great achievements!',
+			attr: { style: 'font-style: italic; opacity: 0.9; margin-bottom: 1rem; line-height: 1.5;' }
+		});
+		
+		// Buy Me a Coffee button
+		const coffeeContainer = containerEl.createDiv({ 
+			cls: 'kanban-settings-coffee',
+			attr: { style: 'margin: 1.5rem 0; text-align: center;' }
+		});
+		
+		const coffeeButton = coffeeContainer.createEl('a', {
+			text: '☕ Buy me a coffee',
+			href: 'https://www.buymeacoffee.com/hudsonventura',
+			attr: { 
+				style: 'display: inline-block; background-color: #FFDD00; color: #000000; padding: 0.7rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; font-family: Poppins, sans-serif; border: 2px solid #000000; transition: all 0.2s ease; cursor: pointer;',
+				target: '_blank',
+				rel: 'noopener noreferrer'
+			}
+		});
+		
+		// Add hover effect via event listeners
+		coffeeButton.addEventListener('mouseenter', () => {
+			coffeeButton.style.transform = 'scale(1.05)';
+			coffeeButton.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+		});
+		coffeeButton.addEventListener('mouseleave', () => {
+			coffeeButton.style.transform = 'scale(1)';
+			coffeeButton.style.boxShadow = 'none';
+		});
+		
+		coffeeContainer.createEl('p', {
+			text: 'If this plugin helps you stay organized and productive, consider supporting its development!',
+			attr: { style: 'margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.7;' }
+		});
+		
+		containerEl.createEl('hr', { 
+			attr: { style: 'margin: 2rem 0; border: none; border-top: 1px solid var(--background-modifier-border);' }
+		});
+		
 		containerEl.createEl('h3', { text: 'Progress Bar Color Thresholds' });
 		
 		containerEl.createEl('p', { 

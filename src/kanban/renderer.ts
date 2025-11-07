@@ -6,6 +6,8 @@ import { AddStatusModal } from "./add-status-modal";
 import { EditTagsModal } from "./edit-tags-modal";
 import { DueDateModal } from "./due-date-modal";
 import { EditTargetTimeModal } from "./edit-target-time-modal";
+import type KanbanPlugin from "../../main";
+import type { KanbanPluginSettings } from "../../main";
 
 const DEFAULT_COLUMNS: KanbanStatus[] = ["todo", "in progress", "done"];
 
@@ -126,6 +128,18 @@ function stopTaskTimer(task: KanbanTask): void {
 	}
 }
 
+function getProgressBarColor(percentage: number, settings: KanbanPluginSettings): string {
+	if (percentage >= settings.progressBarRedThreshold) {
+		return "red";
+	} else if (percentage > settings.progressBarOrangeThreshold) {
+		return "orange";
+	} else if (percentage > settings.progressBarYellowThreshold) {
+		return "yellow";
+	} else {
+		return "green";
+	}
+}
+
 export function renderKanban(
 	containerEl: HTMLElement, 
 	data: KanbanData, 
@@ -134,6 +148,10 @@ export function renderKanban(
 	originalSource: string
 ) {
 	console.log("Kanban Plugin: renderKanban called", { containerEl, data });
+	
+	// Get plugin settings
+	const kanbanPlugin = plugin as KanbanPlugin;
+	const settings = kanbanPlugin.settings;
 	
 	// Create a component for markdown rendering
 	const component = new Component();
@@ -721,18 +739,11 @@ export function renderKanban(
 					progressText.removeClass("kanban-progress-text-orange");
 					progressText.removeClass("kanban-progress-text-red");
 					
-					// Add appropriate color class based on percentage
-					let colorClass = "green";
-					if (percentage >= 100) {
-						colorClass = "red";
-					} else if (percentage >= 85) {
-						colorClass = "orange";
-					} else if (percentage >= 70) {
-						colorClass = "yellow";
-					}
-					
-					progressFill.addClass(`kanban-progress-${colorClass}`);
-					progressText.addClass(`kanban-progress-text-${colorClass}`);
+				// Add appropriate color class based on percentage and settings
+				const colorClass = getProgressBarColor(percentage, settings);
+				
+				progressFill.addClass(`kanban-progress-${colorClass}`);
+				progressText.addClass(`kanban-progress-text-${colorClass}`);
 					
 					// Add running indicator
 					if (isRunning) {
@@ -1976,18 +1987,11 @@ export function renderKanban(
 							progressText.removeClass("kanban-table-progress-text-orange");
 							progressText.removeClass("kanban-table-progress-text-red");
 							
-							// Add appropriate color class based on percentage
-							let colorClass = "green";
-							if (percentage >= 100) {
-								colorClass = "red";
-							} else if (percentage >= 85) {
-								colorClass = "orange";
-							} else if (percentage >= 70) {
-								colorClass = "yellow";
-							}
-							
-							progressFill.addClass(`kanban-table-progress-${colorClass}`);
-							progressText.addClass(`kanban-table-progress-text-${colorClass}`);
+						// Add appropriate color class based on percentage and settings
+						const colorClass = getProgressBarColor(percentage, settings);
+						
+						progressFill.addClass(`kanban-table-progress-${colorClass}`);
+						progressText.addClass(`kanban-table-progress-text-${colorClass}`);
 							
 							// Add running indicator
 							if (isRunning) {
