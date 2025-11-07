@@ -413,11 +413,11 @@ export function renderKanban(
 		const updateDateTimeText = updateDateTimeEl.createSpan({ cls: "kanban-update-datetime-text" });
 		
 		function updateUpdateDateTimeDisplay() {
-			if (task.updateDateTime) {
-				const updateDate = moment(task.updateDateTime);
-				const formattedDate = updateDate.format("MMM D, YYYY HH:mm");
-				updateDateTimeText.setText(formattedDate);
-				updateDateTimeText.removeClass("kanban-update-datetime-empty");
+		if (task.updateDateTime) {
+			const updateDate = moment(task.updateDateTime);
+			const formattedDate = updateDate.format("ddd, YYYY-MM-DD HH:mm");
+			updateDateTimeText.setText(formattedDate);
+			updateDateTimeText.removeClass("kanban-update-datetime-empty");
 			} else {
 				updateDateTimeText.setText("Not updated");
 				updateDateTimeText.addClass("kanban-update-datetime-empty");
@@ -496,11 +496,11 @@ export function renderKanban(
 			if (task.dueDate) {
 				const dueDate = moment(task.dueDate);
 				const now = moment();
-				
-				// Format the date/time
-				const formattedDate = dueDate.format("MMM D, YYYY HH:mm");
-				dueDateText.setText(formattedDate);
-				dueDateText.removeClass("kanban-due-date-empty", "kanban-due-date-overdue", "kanban-due-date-soon", "kanban-due-date-future");
+			
+			// Format the date/time
+			const formattedDate = dueDate.format("ddd, YYYY-MM-DD HH:mm");
+			dueDateText.setText(formattedDate);
+			dueDateText.removeClass("kanban-due-date-empty", "kanban-due-date-overdue", "kanban-due-date-soon", "kanban-due-date-future");
 				
 				// Add class based on due date status
 				if (dueDate.isBefore(now)) {
@@ -1752,30 +1752,30 @@ export function renderKanban(
 					}
 				});
 				
-				// Due date cell
-				const dueDateCell = row.createEl("td", { cls: "kanban-table-cell-due-date" });
-				if (task.dueDate) {
-					const dueDate = moment(task.dueDate);
-					const now = moment();
-					dueDateCell.setText(dueDate.format("MMM D, YYYY HH:mm"));
-					
-					if (dueDate.isBefore(now)) {
-						dueDateCell.addClass("overdue");
-					} else if (dueDate.diff(now, "hours") <= 24) {
-						dueDateCell.addClass("soon");
-					}
-				} else {
-					dueDateCell.setText("—");
-				}
+			// Due date cell
+			const dueDateCell = row.createEl("td", { cls: "kanban-table-cell-due-date" });
+			if (task.dueDate) {
+				const dueDate = moment(task.dueDate);
+				const now = moment();
+				dueDateCell.setText(dueDate.format("ddd, YYYY-MM-DD HH:mm"));
 				
-				// Last updated cell
-				const updatedCell = row.createEl("td", { cls: "kanban-table-cell-updated" });
-				if (task.updateDateTime) {
-					const updateDate = moment(task.updateDateTime);
-					updatedCell.setText(updateDate.format("MMM D, YYYY HH:mm"));
-				} else {
-					updatedCell.setText("—");
+				if (dueDate.isBefore(now)) {
+					dueDateCell.addClass("overdue");
+				} else if (dueDate.diff(now, "hours") <= 24) {
+					dueDateCell.addClass("soon");
 				}
+			} else {
+				dueDateCell.setText("—");
+			}
+				
+			// Last updated cell
+			const updatedCell = row.createEl("td", { cls: "kanban-table-cell-updated" });
+			if (task.updateDateTime) {
+				const updateDate = moment(task.updateDateTime);
+				updatedCell.setText(updateDate.format("ddd, YYYY-MM-DD HH:mm"));
+			} else {
+				updatedCell.setText("—");
+			}
 				
 				// Time spent cell
 				const timeSpentCell = row.createEl("td", { cls: "kanban-table-cell-time-spent" });

@@ -41,6 +41,7 @@ The table displays the following columns for each task:
 
 #### Visual Indicators
 
+- **Date format**: All dates displayed as "ddd, YYYY-MM-DD HH:mm" (e.g., "Mon, 2025-11-07 14:30")
 - **Overdue tasks**: Red text for past-due dates
 - **Soon tasks**: Orange text for tasks due within 24 hours
 - **Running timers**: Blue animated text for active time tracking
