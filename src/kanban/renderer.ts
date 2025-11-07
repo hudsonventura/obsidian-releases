@@ -57,6 +57,20 @@ function formatTimerDuration(milliseconds: number): string {
 	}
 }
 
+function formatTimerDurationNoSeconds(milliseconds: number): string {
+	const duration = moment.duration(milliseconds);
+	const hours = Math.floor(duration.asHours());
+	const minutes = duration.minutes();
+	
+	if (hours > 0) {
+		return `${hours}h ${minutes}m`;
+	} else if (minutes > 0) {
+		return `${minutes}m`;
+	} else {
+		return `0m`;
+	}
+}
+
 function parseTargetTime(targetTime: string | undefined): number {
 	if (!targetTime) return 0;
 
@@ -1492,8 +1506,9 @@ export function renderKanban(
 			const headers = [
 				{ label: "Name", field: "title" as SortField },
 				{ label: "Due Date", field: "dueDate" as SortField },
-				{ label: "Time Spent", field: "timeSpent" as SortField },
 				{ label: "Last Updated", field: "updateDateTime" as SortField },
+				{ label: "Time Spent", field: "timeSpent" as SortField },
+				{ label: "Progress", field: null }, // Progress bar column
 				{ label: "", field: null } // Actions column for timer buttons
 			];
 			
@@ -1653,9 +1668,37 @@ export function renderKanban(
 										return;
 									}
 									
+									// Get column states for timer logic
+									const oldColumnState = getColumnState(status);
+									const newColumnState = getColumnState(targetStatus);
+									
 									// Update task status
 									task.status = targetStatus;
 									task.updateDateTime = moment().toISOString();
+									
+									// Timer logic: Start timer if moving to in-progress, stop if moving away
+									if (newColumnState === "in-progress") {
+										// Moving to in-progress - start timer
+										// First stop all other running timers
+										taskElements.forEach((info) => {
+											if (isTaskTimerRunning(info.task)) {
+												stopTaskTimer(info.task);
+												console.log("Kanban: Auto-stopped timer for task:", info.task.task);
+											}
+										});
+										
+										// Start timer for this task if not already running
+										if (!isTaskTimerRunning(task)) {
+											startTaskTimer(task);
+											console.log("Kanban: Auto-started timer for task:", task.task);
+										}
+									} else if (oldColumnState === "in-progress") {
+										// Moving away from in-progress - stop timer
+										if (isTaskTimerRunning(task)) {
+											stopTaskTimer(task);
+											console.log("Kanban: Auto-stopped timer for task:", task.task);
+										}
+									}
 									
 									// Update tasksByStatus map
 									const oldStatusTasks = tasksByStatus.get(status) || [];
@@ -1725,6 +1768,15 @@ export function renderKanban(
 					dueDateCell.setText("—");
 				}
 				
+				// Last updated cell
+				const updatedCell = row.createEl("td", { cls: "kanban-table-cell-updated" });
+				if (task.updateDateTime) {
+					const updateDate = moment(task.updateDateTime);
+					updatedCell.setText(updateDate.format("MMM D, YYYY HH:mm"));
+				} else {
+					updatedCell.setText("—");
+				}
+				
 				// Time spent cell
 				const timeSpentCell = row.createEl("td", { cls: "kanban-table-cell-time-spent" });
 				const timeDisplay = timeSpentCell.createSpan("kanban-table-time-display");
@@ -1734,8 +1786,11 @@ export function renderKanban(
 					const totalDuration = getTaskTimerDuration(task);
 					const isRunning = isTaskTimerRunning(task);
 					
-					if (totalDuration > 0) {
-						timeDisplay.setText(formatTimerDuration(totalDuration));
+					if (totalDuration > 0 || task.targetTime) {
+						const spentText = totalDuration > 0 ? formatTimerDuration(totalDuration) : "0";
+						const targetDuration = parseTargetTime(task.targetTime);
+						const targetText = targetDuration > 0 ? formatTimerDurationNoSeconds(targetDuration) : "—";
+						timeDisplay.setText(`${spentText} / ${targetText}`);
 						timeDisplay.removeClass("empty");
 					} else {
 						timeDisplay.setText("—");
@@ -1760,16 +1815,88 @@ export function renderKanban(
 						actionsCell.removeClass("running");
 						row.removeClass("timer-running");
 					}
+				}
+				
+				// Progress bar cell
+				const progressCell = row.createEl("td", { cls: "kanban-table-cell-progress" });
+				const progressContainer = progressCell.createDiv("kanban-table-progress-container");
+				const progressBar = progressContainer.createDiv("kanban-table-progress-bar");
+				const progressFill = progressBar.createDiv("kanban-table-progress-fill");
+				const progressText = progressContainer.createDiv("kanban-table-progress-text");
+				
+				// Function to update progress bar
+				const updateProgressBar = () => {
+					const totalDuration = getTaskTimerDuration(task);
+					const isRunning = isTaskTimerRunning(task);
+					
+					if (task.targetTime) {
+						// Has target time - show progress bar with percentage
+						const targetDuration = parseTargetTime(task.targetTime);
+						
+						if (targetDuration > 0) {
+							const percentage = (totalDuration / targetDuration) * 100;
+							const displayPercentage = Math.min(100, percentage);
+							
+							progressFill.setCssStyles({ width: `${displayPercentage}%` });
+							progressFill.style.display = "block";
+							
+							// Remove all color classes
+							progressFill.removeClass("kanban-table-progress-green");
+							progressFill.removeClass("kanban-table-progress-yellow");
+							progressFill.removeClass("kanban-table-progress-orange");
+							progressFill.removeClass("kanban-table-progress-red");
+							progressText.removeClass("kanban-table-progress-text-green");
+							progressText.removeClass("kanban-table-progress-text-yellow");
+							progressText.removeClass("kanban-table-progress-text-orange");
+							progressText.removeClass("kanban-table-progress-text-red");
+							
+							// Add appropriate color class based on percentage
+							let colorClass = "green";
+							if (percentage >= 100) {
+								colorClass = "red";
+							} else if (percentage >= 85) {
+								colorClass = "orange";
+							} else if (percentage >= 70) {
+								colorClass = "yellow";
+							}
+							
+							progressFill.addClass(`kanban-table-progress-${colorClass}`);
+							progressText.addClass(`kanban-table-progress-text-${colorClass}`);
+							
+							// Add running indicator
+							if (isRunning) {
+								progressFill.addClass("kanban-table-progress-running");
+							} else {
+								progressFill.removeClass("kanban-table-progress-running");
+							}
+							
+							// Format the text
+							progressText.setText(`${percentage.toFixed(0)}%`);
+							
+							if (isRunning) {
+								progressText.addClass("kanban-table-progress-text-running");
+							} else {
+								progressText.removeClass("kanban-table-progress-text-running");
+							}
+						}
+					} else {
+						// No target time - hide the bar, show placeholder
+						progressFill.style.display = "none";
+						progressText.removeClass("kanban-table-progress-text-green");
+						progressText.removeClass("kanban-table-progress-text-yellow");
+						progressText.removeClass("kanban-table-progress-text-orange");
+						progressText.removeClass("kanban-table-progress-text-red");
+						progressText.removeClass("kanban-table-progress-text-running");
+						progressText.setText("—");
+						progressText.addClass("kanban-table-progress-text-empty");
+					}
 				};
 				
-				// Last updated cell
-				const updatedCell = row.createEl("td", { cls: "kanban-table-cell-updated" });
-				if (task.updateDateTime) {
-					const updateDate = moment(task.updateDateTime);
-					updatedCell.setText(updateDate.format("MMM D, YYYY HH:mm"));
-				} else {
-					updatedCell.setText("—");
-				}
+				// Initial display
+				updateProgressBar();
+				
+				// Store update function for interval
+				(row as any).updateProgressBar = updateProgressBar;
 				
 				// Actions cell with timer buttons
 				const actionsCell = row.createEl("td", { cls: "kanban-table-cell-actions" });
@@ -1992,10 +2119,41 @@ export function renderKanban(
 				taskElements.delete(movedTaskEl);
 				movedTaskEl.remove();
 				
+				// Get column states for timer logic
+				const oldColumnState = getColumnState(sourceStatus);
+				const newColumnState = getColumnState(status);
+				
 				// Update task status
 				movedTask.task.status = status;
 				movedTask.task.updateDateTime = moment().toISOString();
 				movedTask.status = status;
+				
+				// Timer logic: Start timer if moving to in-progress, stop if moving away
+				if (sourceStatus !== status) {
+					// Only apply timer logic when actually changing status
+					if (newColumnState === "in-progress") {
+						// Moving to in-progress - start timer
+						// First stop all other running timers
+						taskElements.forEach((info) => {
+							if (isTaskTimerRunning(info.task)) {
+								stopTaskTimer(info.task);
+								console.log("Kanban: Auto-stopped timer for task:", info.task.task);
+							}
+						});
+						
+						// Start timer for this task if not already running
+						if (!isTaskTimerRunning(movedTask.task)) {
+							startTaskTimer(movedTask.task);
+							console.log("Kanban: Auto-started timer for task:", movedTask.task.task);
+						}
+					} else if (oldColumnState === "in-progress") {
+						// Moving away from in-progress - stop timer
+						if (isTaskTimerRunning(movedTask.task)) {
+							stopTaskTimer(movedTask.task);
+							console.log("Kanban: Auto-stopped timer for task:", movedTask.task.task);
+						}
+					}
+				}
 				
 				// Handle reordering within same status or moving to different status
 				if (sourceStatus === status && draggedOverRow) {
@@ -2731,12 +2889,16 @@ export function renderKanban(
 			return;
 		}
 		
-		// Update all task timer displays
+		// Update all task timer displays and progress bars
 		taskElements.forEach((info, taskEl) => {
 			if (isTaskTimerRunning(info.task)) {
 				const updateFn = (taskEl as any).updateTimerDisplay;
 				if (updateFn) {
 					updateFn();
+				}
+				const updateProgressFn = (taskEl as any).updateProgressBar;
+				if (updateProgressFn) {
+					updateProgressFn();
 				}
 			}
 		});
