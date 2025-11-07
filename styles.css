@@ -1252,16 +1252,8 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	flex-shrink: 0;
 }
 
-/* Slim Mode: Hide all information except task title */
+/* Slim Mode: Hide all information except task title and target time/due date row */
 .kanban-slim-mode .kanban-task-tags {
-	display: none !important;
-}
-
-.kanban-slim-mode .kanban-task-target-time {
-	display: none !important;
-}
-
-.kanban-slim-mode .kanban-task-target-time-row {
 	display: none !important;
 }
 
@@ -1289,15 +1281,23 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	display: none !important;
 }
 
-.kanban-slim-mode .kanban-due-date {
-	display: none !important;
-}
-
 .kanban-slim-mode .kanban-timer-display {
 	display: none !important;
 }
 
-/* Keep only task title visible in slim mode */
+/* Keep task title, target time, and due date visible in slim mode */
 .kanban-slim-mode .kanban-task-content {
 	display: block !important;
+}
+
+.kanban-slim-mode .kanban-task-target-time-row {
+	display: flex !important;
+}
+
+.kanban-slim-mode .kanban-task-target-time {
+	display: flex !important;
+}
+
+.kanban-slim-mode .kanban-task-due-date {
+	display: flex !important;
 }

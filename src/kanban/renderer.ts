@@ -369,10 +369,66 @@ export function renderKanban(
 			}
 		});
 		
-		// Target time and timer controls row
+		// First row: Update datetime and timer controls
+		const updateDateTimeRow = taskEl.createDiv("kanban-task-datetime-row");
+		
+		// Update DateTime display on the left
+		const updateDateTimeEl = updateDateTimeRow.createDiv("kanban-task-update-datetime");
+		
+		const updateIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		updateIcon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+		updateIcon.setAttribute("width", "12");
+		updateIcon.setAttribute("height", "12");
+		updateIcon.setAttribute("viewBox", "0 0 24 24");
+		updateIcon.setAttribute("fill", "none");
+		updateIcon.setAttribute("stroke", "currentColor");
+		updateIcon.setAttribute("stroke-width", "2");
+		updateIcon.setAttribute("stroke-linecap", "round");
+		updateIcon.setAttribute("stroke-linejoin", "round");
+		updateIcon.innerHTML = '<polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>';
+		updateDateTimeEl.appendChild(updateIcon);
+		
+		const updateDateTimeText = updateDateTimeEl.createSpan({ cls: "kanban-update-datetime-text" });
+		
+		function updateUpdateDateTimeDisplay() {
+			if (task.updateDateTime) {
+				const updateDate = moment(task.updateDateTime);
+				const formattedDate = updateDate.format("MMM D, YYYY HH:mm");
+				updateDateTimeText.setText(formattedDate);
+				updateDateTimeText.removeClass("kanban-update-datetime-empty");
+			} else {
+				updateDateTimeText.setText("Not updated");
+				updateDateTimeText.addClass("kanban-update-datetime-empty");
+			}
+		}
+		
+		// Initial update datetime display
+		updateUpdateDateTimeDisplay();
+		
+		// Store update function for external calls
+		(taskEl as any).updateUpdateDateTimeDisplay = updateUpdateDateTimeDisplay;
+		
+		// Timer buttons on the same row (right side)
+		const timerButtons = updateDateTimeRow.createDiv("kanban-timer-buttons");
+		
+		// Start button
+		const startButton = timerButtons.createEl("button", {
+			cls: "kanban-timer-button kanban-timer-start",
+			attr: { "aria-label": "Start timer" }
+		});
+		startButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+		
+		// Stop button
+		const stopButton = timerButtons.createEl("button", {
+			cls: "kanban-timer-button kanban-timer-stop",
+			attr: { "aria-label": "Stop timer" }
+		});
+		stopButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>`;
+		
+		// Second row: Target time and due date
 		const targetTimeRow = taskEl.createDiv("kanban-task-target-time-row");
 		
-		// Target time display
+		// Target time display on the left
 		const targetTimeEl = targetTimeRow.createDiv("kanban-task-target-time");
 		const clockIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 		clockIcon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
@@ -396,22 +452,82 @@ export function renderKanban(
 			targetTimeText.addClass("kanban-target-time-empty");
 		}
 		
-		// Timer buttons on the same row
-		const timerButtons = targetTimeRow.createDiv("kanban-timer-buttons");
+		// Due date display on the right
+		const dueDateEl = targetTimeRow.createDiv("kanban-task-due-date");
 		
-		// Start button
-		const startButton = timerButtons.createEl("button", {
-			cls: "kanban-timer-button kanban-timer-start",
-			attr: { "aria-label": "Start timer" }
-		});
-		startButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+		const calendarIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		calendarIcon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+		calendarIcon.setAttribute("width", "12");
+		calendarIcon.setAttribute("height", "12");
+		calendarIcon.setAttribute("viewBox", "0 0 24 24");
+		calendarIcon.setAttribute("fill", "none");
+		calendarIcon.setAttribute("stroke", "currentColor");
+		calendarIcon.setAttribute("stroke-width", "2");
+		calendarIcon.setAttribute("stroke-linecap", "round");
+		calendarIcon.setAttribute("stroke-linejoin", "round");
+		calendarIcon.innerHTML = '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>';
+		dueDateEl.appendChild(calendarIcon);
 		
-		// Stop button
-		const stopButton = timerButtons.createEl("button", {
-			cls: "kanban-timer-button kanban-timer-stop",
-			attr: { "aria-label": "Stop timer" }
+		const dueDateText = dueDateEl.createSpan({ cls: "kanban-due-date-text" });
+		
+		function updateDueDateDisplay() {
+			if (task.dueDate) {
+				const dueDate = moment(task.dueDate);
+				const now = moment();
+				
+				// Format the date/time
+				const formattedDate = dueDate.format("MMM D, YYYY HH:mm");
+				dueDateText.setText(formattedDate);
+				dueDateText.removeClass("kanban-due-date-empty", "kanban-due-date-overdue", "kanban-due-date-soon", "kanban-due-date-future");
+				
+				// Add class based on due date status
+				if (dueDate.isBefore(now)) {
+					dueDateText.addClass("kanban-due-date-overdue");
+				} else if (dueDate.diff(now, "hours") <= 24) {
+					dueDateText.addClass("kanban-due-date-soon");
+				} else {
+					dueDateText.addClass("kanban-due-date-future");
+				}
+			} else {
+				dueDateText.setText("No due date");
+				dueDateText.addClass("kanban-due-date-empty");
+				dueDateText.removeClass("kanban-due-date-overdue", "kanban-due-date-soon", "kanban-due-date-future");
+			}
+		}
+		
+		// Initial due date display
+		updateDueDateDisplay();
+		
+		// Store update function for external calls
+		(taskEl as any).updateDueDateDisplay = updateDueDateDisplay;
+		
+		// Double-click to edit due date
+		dueDateEl.addEventListener("dblclick", (e) => {
+			e.stopPropagation();
+			
+			// Open calendar modal
+			const modal = new DueDateModal(
+				plugin.app,
+				task.dueDate,
+				async (newDate) => {
+					if (newDate === null) {
+						// Clear due date
+						task.dueDate = undefined;
+					} else {
+						// Set new due date
+						task.dueDate = newDate;
+					}
+					
+					// Update display
+					updateDueDateDisplay();
+					
+					// Save to file
+					await saveTasksToFile(task.task);
+					console.log("Kanban: Due date updated:", task.dueDate);
+				}
+			);
+			modal.open();
 		});
-		stopButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>`;
 		
 		// Double-click to edit target time
 		let isEditingTargetTime = false;
@@ -665,123 +781,7 @@ export function renderKanban(
 		// Initial update
 		updateProgressBar();
 		
-		// DateTime row (update datetime and due date)
-		const dateTimeRow = taskEl.createDiv("kanban-task-datetime-row");
-		
-		// Update DateTime display on the left
-		const updateDateTimeEl = dateTimeRow.createDiv("kanban-task-update-datetime");
-		
-		const updateIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-		updateIcon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-		updateIcon.setAttribute("width", "12");
-		updateIcon.setAttribute("height", "12");
-		updateIcon.setAttribute("viewBox", "0 0 24 24");
-		updateIcon.setAttribute("fill", "none");
-		updateIcon.setAttribute("stroke", "currentColor");
-		updateIcon.setAttribute("stroke-width", "2");
-		updateIcon.setAttribute("stroke-linecap", "round");
-		updateIcon.setAttribute("stroke-linejoin", "round");
-		updateIcon.innerHTML = '<polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>';
-		updateDateTimeEl.appendChild(updateIcon);
-		
-		const updateDateTimeText = updateDateTimeEl.createSpan({ cls: "kanban-update-datetime-text" });
-		
-		function updateUpdateDateTimeDisplay() {
-			if (task.updateDateTime) {
-				const updateDate = moment(task.updateDateTime);
-				const formattedDate = updateDate.format("MMM D, YYYY HH:mm");
-				updateDateTimeText.setText(formattedDate);
-				updateDateTimeText.removeClass("kanban-update-datetime-empty");
-			} else {
-				updateDateTimeText.setText("Not updated");
-				updateDateTimeText.addClass("kanban-update-datetime-empty");
-			}
-		}
-		
-		// Initial update datetime display
-		updateUpdateDateTimeDisplay();
-		
-		// Store update function for external calls
-		(taskEl as any).updateUpdateDateTimeDisplay = updateUpdateDateTimeDisplay;
-		
-		// Due date display on the right
-		const dueDateEl = dateTimeRow.createDiv("kanban-task-due-date");
-		
-		const calendarIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-		calendarIcon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-		calendarIcon.setAttribute("width", "12");
-		calendarIcon.setAttribute("height", "12");
-		calendarIcon.setAttribute("viewBox", "0 0 24 24");
-		calendarIcon.setAttribute("fill", "none");
-		calendarIcon.setAttribute("stroke", "currentColor");
-		calendarIcon.setAttribute("stroke-width", "2");
-		calendarIcon.setAttribute("stroke-linecap", "round");
-		calendarIcon.setAttribute("stroke-linejoin", "round");
-		calendarIcon.innerHTML = '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>';
-		dueDateEl.appendChild(calendarIcon);
-		
-		const dueDateText = dueDateEl.createSpan({ cls: "kanban-due-date-text" });
-		
-		function updateDueDateDisplay() {
-			if (task.dueDate) {
-				const dueDate = moment(task.dueDate);
-				const now = moment();
-				
-				// Format the date/time
-				const formattedDate = dueDate.format("MMM D, YYYY HH:mm");
-				dueDateText.setText(formattedDate);
-				dueDateText.removeClass("kanban-due-date-empty", "kanban-due-date-overdue", "kanban-due-date-soon", "kanban-due-date-future");
-				
-				// Add class based on due date status
-				if (dueDate.isBefore(now)) {
-					dueDateText.addClass("kanban-due-date-overdue");
-				} else if (dueDate.diff(now, "hours") <= 24) {
-					dueDateText.addClass("kanban-due-date-soon");
-				} else {
-					dueDateText.addClass("kanban-due-date-future");
-				}
-			} else {
-				dueDateText.setText("No due date");
-				dueDateText.addClass("kanban-due-date-empty");
-				dueDateText.removeClass("kanban-due-date-overdue", "kanban-due-date-soon", "kanban-due-date-future");
-			}
-		}
-		
-		// Initial due date display
-		updateDueDateDisplay();
-		
-		// Store update function for external calls
-		(taskEl as any).updateDueDateDisplay = updateDueDateDisplay;
-		
-		// Double-click to edit due date
-		dueDateEl.addEventListener("dblclick", (e) => {
-			e.stopPropagation();
-			
-			// Open calendar modal
-			const modal = new DueDateModal(
-				plugin.app,
-				task.dueDate,
-				async (newDate) => {
-					if (newDate === null) {
-						// Clear due date
-						task.dueDate = undefined;
-					} else {
-						// Set new due date
-						task.dueDate = newDate;
-					}
-					
-					// Update display
-					updateDueDateDisplay();
-					
-					// Save to file
-					await saveTasksToFile(task.task);
-					console.log("Kanban: Due date updated:", task.dueDate);
-				}
-			);
-			modal.open();
-		});
-		
-		// Tags section (below datetime row)
+		// Tags section (below progress bar)
 		const tagsContainer = taskEl.createDiv("kanban-task-tags");
 		
 		function updateTagsDisplay() {
