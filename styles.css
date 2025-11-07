@@ -1908,3 +1908,29 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 		max-width: 250px;
 	}
 }
+
+/* Column resizing */
+.resizable-column {
+	position: relative;
+}
+
+.column-resizer {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 8px;
+	height: 100%;
+	cursor: col-resize;
+	user-select: none;
+	z-index: 1;
+}
+
+.column-resizer:hover {
+	background-color: var(--interactive-accent);
+	opacity: 0.3;
+}
+
+.column-resizer:active {
+	background-color: var(--interactive-accent);
+	opacity: 0.5;
+}

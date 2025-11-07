@@ -1502,44 +1502,107 @@ export function renderKanban(
 			const thead = table.createEl("thead");
 			const headerRow = thead.createEl("tr");
 			
-			// Table headers with sorting
-			const headers = [
-				{ label: "Name", field: "title" as SortField },
-				{ label: "Due Date", field: "dueDate" as SortField },
-				{ label: "Last Updated", field: "updateDateTime" as SortField },
-				{ label: "Time Spent", field: "timeSpent" as SortField },
-				{ label: "Progress", field: null }, // Progress bar column
-				{ label: "", field: null } // Actions column for timer buttons
-			];
+		// Table headers with sorting
+		const headers = [
+			{ label: "Name", field: "title" as SortField, key: "name" },
+			{ label: "Due Date", field: "dueDate" as SortField, key: "dueDate" },
+			{ label: "Last Updated", field: "updateDateTime" as SortField, key: "lastUpdated" },
+			{ label: "Time Spent", field: "timeSpent" as SortField, key: "timeSpent" },
+			{ label: "Progress", field: null, key: "progress" }, // Progress bar column
+			{ label: "", field: null, key: "actions" } // Actions column for timer buttons
+		];
+		
+		// Get stored column widths from data or use defaults
+		if (!data.columnWidths) {
+			data.columnWidths = {};
+		}
+		
+		headers.forEach((header, index) => {
+			const th = headerRow.createEl("th");
+			th.addClass("resizable-column");
 			
-			headers.forEach(header => {
-				const th = headerRow.createEl("th");
-				th.setText(header.label);
-				if (header.field) {
-					th.addClass("sortable");
-					th.addEventListener("click", () => {
-						// Get or create column metadata
-						let metadata = data.columnMetadata?.find(m => m.name === status);
-						if (!metadata) {
-							metadata = { name: status, state: columnState, sortField: "updateDateTime", sortOrder: "desc" };
-							if (!data.columnMetadata) data.columnMetadata = [];
-							data.columnMetadata.push(metadata);
-						}
+			// Apply stored width if available
+			if (data.columnWidths && data.columnWidths[header.key]) {
+				th.style.width = data.columnWidths[header.key] + "px";
+			}
+			
+			th.setText(header.label);
+			if (header.field) {
+				th.addClass("sortable");
+				th.addEventListener("click", (e) => {
+					// Don't trigger sort if clicking on resizer
+					if ((e.target as HTMLElement).classList.contains("column-resizer")) {
+						return;
+					}
+					
+					// Get or create column metadata
+					let metadata = data.columnMetadata?.find(m => m.name === status);
+					if (!metadata) {
+						metadata = { name: status, state: columnState, sortField: "updateDateTime", sortOrder: "desc" };
+						if (!data.columnMetadata) data.columnMetadata = [];
+						data.columnMetadata.push(metadata);
+					}
+					
+					// Toggle sort
+					if (metadata.sortField === header.field) {
+						metadata.sortOrder = metadata.sortOrder === "asc" ? "desc" : "asc";
+					} else {
+						metadata.sortField = header.field;
+						metadata.sortOrder = "asc";
+					}
+					
+					// Re-render table view
+					renderTableView();
+					saveCollapsedState();
+				});
+			}
+			
+			// Add resize handle (except for last column)
+			if (index < headers.length - 1) {
+				const resizer = th.createDiv({ cls: "column-resizer" });
+				
+				let startX = 0;
+				let startWidth = 0;
+				
+				resizer.addEventListener("mousedown", (e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					
+					startX = e.pageX;
+					startWidth = th.offsetWidth;
+					
+					const onMouseMove = (moveEvent: MouseEvent) => {
+						const diff = moveEvent.pageX - startX;
+						const newWidth = Math.max(50, startWidth + diff); // Min width 50px
+						th.style.width = newWidth + "px";
 						
-						// Toggle sort
-						if (metadata.sortField === header.field) {
-							metadata.sortOrder = metadata.sortOrder === "asc" ? "desc" : "asc";
-						} else {
-							metadata.sortField = header.field;
-							metadata.sortOrder = "asc";
-						}
-						
-						// Re-render table view
-						renderTableView();
-						saveCollapsedState();
-					});
-				}
-			});
+						// Also update corresponding cells in this column
+						const columnIndex = index;
+						table.querySelectorAll(`tbody tr`).forEach((row) => {
+							const cell = row.children[columnIndex] as HTMLElement;
+							if (cell) {
+								cell.style.width = newWidth + "px";
+							}
+						});
+					};
+					
+				const onMouseUp = () => {
+					// Store the new width
+					if (!data.columnWidths) {
+						data.columnWidths = {};
+					}
+					data.columnWidths[header.key] = th.offsetWidth;
+					saveCollapsedState();
+					
+					document.removeEventListener("mousemove", onMouseMove);
+					document.removeEventListener("mouseup", onMouseUp);
+				};
+					
+					document.addEventListener("mousemove", onMouseMove);
+					document.addEventListener("mouseup", onMouseUp);
+				});
+			}
+		});
 			
 			// Table body
 			const tbody = table.createEl("tbody");
@@ -1610,9 +1673,12 @@ export function renderKanban(
 				
 				// Set up drag handlers
 				setupTaskDragHandlers(row, status);
-				
-				// Task name cell with status button and inline tags
-				const nameCell = row.createEl("td", { cls: "kanban-table-cell-name" });
+			
+			// Task name cell with status button and inline tags
+			const nameCell = row.createEl("td", { cls: "kanban-table-cell-name" });
+			if (data.columnWidths?.name) {
+				nameCell.style.width = data.columnWidths.name + "px";
+			}
 				
 				// Status button container
 				const statusButtonContainer = nameCell.createDiv("kanban-table-status-button-container");
@@ -1752,9 +1818,12 @@ export function renderKanban(
 					}
 				});
 				
-			// Due date cell
-			const dueDateCell = row.createEl("td", { cls: "kanban-table-cell-due-date" });
-			if (task.dueDate) {
+		// Due date cell
+		const dueDateCell = row.createEl("td", { cls: "kanban-table-cell-due-date" });
+		if (data.columnWidths?.dueDate) {
+			dueDateCell.style.width = data.columnWidths.dueDate + "px";
+		}
+		if (task.dueDate) {
 				const dueDate = moment(task.dueDate);
 				const now = moment();
 				dueDateCell.setText(dueDate.format("ddd, YYYY-MM-DD HH:mm"));
@@ -1768,18 +1837,24 @@ export function renderKanban(
 				dueDateCell.setText("—");
 			}
 				
-			// Last updated cell
-			const updatedCell = row.createEl("td", { cls: "kanban-table-cell-updated" });
-			if (task.updateDateTime) {
+		// Last updated cell
+		const updatedCell = row.createEl("td", { cls: "kanban-table-cell-updated" });
+		if (data.columnWidths?.lastUpdated) {
+			updatedCell.style.width = data.columnWidths.lastUpdated + "px";
+		}
+		if (task.updateDateTime) {
 				const updateDate = moment(task.updateDateTime);
 				updatedCell.setText(updateDate.format("ddd, YYYY-MM-DD HH:mm"));
 			} else {
 				updatedCell.setText("—");
 			}
-				
-				// Time spent cell
-				const timeSpentCell = row.createEl("td", { cls: "kanban-table-cell-time-spent" });
-				const timeDisplay = timeSpentCell.createSpan("kanban-table-time-display");
+			
+			// Time spent cell
+			const timeSpentCell = row.createEl("td", { cls: "kanban-table-cell-time-spent" });
+			if (data.columnWidths?.timeSpent) {
+				timeSpentCell.style.width = data.columnWidths.timeSpent + "px";
+			}
+			const timeDisplay = timeSpentCell.createSpan("kanban-table-time-display");
 				
 				// Function to update timer display
 				const updateTimerDisplay = () => {
@@ -1816,10 +1891,13 @@ export function renderKanban(
 						row.removeClass("timer-running");
 					}
 				}
-				
-				// Progress bar cell
-				const progressCell = row.createEl("td", { cls: "kanban-table-cell-progress" });
-				const progressContainer = progressCell.createDiv("kanban-table-progress-container");
+			
+			// Progress bar cell
+			const progressCell = row.createEl("td", { cls: "kanban-table-cell-progress" });
+			if (data.columnWidths?.progress) {
+				progressCell.style.width = data.columnWidths.progress + "px";
+			}
+			const progressContainer = progressCell.createDiv("kanban-table-progress-container");
 				const progressBar = progressContainer.createDiv("kanban-table-progress-bar");
 				const progressFill = progressBar.createDiv("kanban-table-progress-fill");
 				const progressText = progressContainer.createDiv("kanban-table-progress-text");
@@ -1897,10 +1975,13 @@ export function renderKanban(
 				
 				// Store update function for interval
 				(row as any).updateProgressBar = updateProgressBar;
-				
-				// Actions cell with timer buttons
-				const actionsCell = row.createEl("td", { cls: "kanban-table-cell-actions" });
-				const timerButtons = actionsCell.createDiv("kanban-table-timer-buttons");
+			
+			// Actions cell with timer buttons
+			const actionsCell = row.createEl("td", { cls: "kanban-table-cell-actions" });
+			if (data.columnWidths?.actions) {
+				actionsCell.style.width = data.columnWidths.actions + "px";
+			}
+			const timerButtons = actionsCell.createDiv("kanban-table-timer-buttons");
 				
 				// Start button
 				const startButton = timerButtons.createEl("button", {

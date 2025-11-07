@@ -39,6 +39,13 @@ The table displays the following columns for each task:
 - Toggle between ascending/descending order
 - Each status section maintains its own sort preferences
 
+#### Column Resizing
+
+- Drag the right edge of any column header to resize it
+- Column widths are automatically saved and persist across sessions
+- Minimum column width is 50px to maintain usability
+- Resize handle appears on hover at the right edge of column headers
+
 #### Visual Indicators
 
 - **Date format**: All dates displayed as "ddd, YYYY-MM-DD HH:mm" (e.g., "Mon, 2025-11-07 14:30")
