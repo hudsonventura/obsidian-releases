@@ -568,6 +568,57 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	opacity: 0.8;
 }
 
+/* Drop indicator for task reordering */
+.kanban-drop-indicator {
+	pointer-events: none;
+	flex-shrink: 0;
+}
+
+/* Vertical view: horizontal line indicator */
+.kanban-board-vertical .kanban-drop-indicator {
+	width: 100%;
+	height: 3px;
+	background: none;
+	border-top: 3px solid var(--interactive-accent);
+	margin: 0.25rem 0;
+	position: relative;
+}
+
+.kanban-board-vertical .kanban-drop-indicator::before {
+	content: '';
+	position: absolute;
+	left: -6px;
+	top: -6px;
+	width: 12px;
+	height: 12px;
+	background-color: var(--interactive-accent);
+	border-radius: 50%;
+	box-shadow: 0 0 6px var(--interactive-accent);
+}
+
+/* Horizontal view: vertical line indicator */
+.kanban-board-horizontal .kanban-drop-indicator {
+	width: 3px;
+	min-height: 80px;
+	background: none;
+	border-left: 3px solid var(--interactive-accent);
+	margin: 0 0.25rem;
+	position: relative;
+	flex-shrink: 0;
+}
+
+.kanban-board-horizontal .kanban-drop-indicator::before {
+	content: '';
+	position: absolute;
+	top: -6px;
+	left: -6px;
+	width: 12px;
+	height: 12px;
+	background-color: var(--interactive-accent);
+	border-radius: 50%;
+	box-shadow: 0 0 6px var(--interactive-accent);
+}
+
 /* Timer Styles */
 
 .kanban-task-timer-running {
@@ -1418,12 +1469,68 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 
 .kanban-table tbody tr {
 	border-bottom: 1px solid transparent;
+	border-left: 3px solid transparent;
 	transition: all 0.2s ease;
 }
 
 .kanban-table tbody tr:hover {
 	background-color: var(--background-modifier-hover);
 	border-bottom-color: var(--background-modifier-border);
+}
+
+/* Prominent highlight for rows with active timer */
+.kanban-table tbody tr.timer-running {
+	background-color: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.1);
+	border-left-color: var(--interactive-accent);
+	animation: timer-row-pulse 2s ease-in-out infinite;
+}
+
+.kanban-table tbody tr.timer-running:hover {
+	background-color: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.15);
+}
+
+/* Make the status button more prominent when timer is running */
+.kanban-table tbody tr.timer-running .kanban-table-status-button {
+	animation: status-icon-pulse 2s ease-in-out infinite;
+	box-shadow: 0 0 8px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.5);
+}
+
+/* Make task name more prominent when timer is running */
+.kanban-table tbody tr.timer-running .kanban-table-cell-name {
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+/* Make stop button more prominent when timer is running */
+.kanban-table tbody tr.timer-running .kanban-table-timer-stop:not(.disabled) {
+	animation: stop-button-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes stop-button-pulse {
+	0%, 100% {
+		box-shadow: 0 0 0 0 rgba(var(--color-red-rgb, 244, 67, 54), 0.4);
+	}
+	50% {
+		box-shadow: 0 0 0 4px rgba(var(--color-red-rgb, 244, 67, 54), 0);
+	}
+}
+
+@keyframes timer-row-pulse {
+	0%, 100% {
+		background-color: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.1);
+	}
+	50% {
+		background-color: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.15);
+	}
+}
+
+@keyframes status-icon-pulse {
+	0%, 100% {
+		transform: scale(1);
+	}
+	50% {
+		transform: scale(1.1);
+	}
 }
 
 .kanban-table td {
@@ -1447,8 +1554,81 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	word-wrap: break-word;
 }
 
+.kanban-table-cell-name {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.kanban-table-status-button-container {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+}
+
+.kanban-table-status-button {
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 0.2rem;
+	border-radius: 4px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.2s ease;
+	width: 20px;
+	height: 20px;
+	flex-shrink: 0;
+}
+
+.kanban-table-status-button:hover {
+	background-color: var(--background-modifier-hover);
+	transform: scale(1.1);
+}
+
+.kanban-table-status-button:active {
+	transform: scale(0.95);
+}
+
+.kanban-table-status-button.status-todo {
+	color: var(--text-muted);
+}
+
+.kanban-table-status-button.status-todo:hover {
+	color: var(--text-normal);
+}
+
+.kanban-table-status-button.status-in-progress {
+	color: var(--interactive-accent);
+}
+
+.kanban-table-status-button.status-in-progress:hover {
+	color: var(--interactive-accent-hover);
+}
+
+.kanban-table-status-button.status-done {
+	color: var(--color-green);
+}
+
+.kanban-table-status-button.status-done:hover {
+	color: var(--text-success);
+}
+
+.kanban-table-status-button svg {
+	width: 14px;
+	height: 14px;
+}
+
+.kanban-table-task-content {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+}
+
 .kanban-table-cell-name .kanban-tag {
-	margin-left: 0.35rem;
 	display: inline-flex;
 	vertical-align: middle;
 }
@@ -1486,13 +1666,89 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	font-family: var(--font-monospace);
 	font-size: 0.65rem;
 	white-space: nowrap;
-	min-width: 85px;
+	min-width: 70px;
+	text-align: left;
 }
 
-.kanban-table-cell-time-spent.running {
+.kanban-table-time-display {
+	display: inline-block;
+}
+
+.kanban-table-time-display.empty {
+	color: var(--text-muted);
+}
+
+.kanban-table-cell-time-spent.running .kanban-table-time-display {
 	color: var(--interactive-accent);
 	font-weight: 600;
 	animation: timer-blink 2s ease-in-out infinite;
+}
+
+.kanban-table-cell-actions {
+	min-width: 60px;
+	width: 60px;
+	text-align: center;
+	padding: 0.3rem 0.4rem !important;
+}
+
+.kanban-table-cell-actions.running {
+	background-color: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.05);
+}
+
+.kanban-table-timer-buttons {
+	display: flex;
+	gap: 0.25rem;
+	justify-content: center;
+	align-items: center;
+}
+
+.kanban-table-timer-button {
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 0.15rem;
+	border-radius: 3px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.2s ease;
+	width: 18px;
+	height: 18px;
+	flex-shrink: 0;
+}
+
+.kanban-table-timer-button:hover:not(.disabled) {
+	background-color: var(--background-modifier-hover);
+}
+
+.kanban-table-timer-button:active:not(.disabled) {
+	transform: scale(0.9);
+}
+
+.kanban-table-timer-start:not(.disabled) {
+	color: var(--color-green);
+}
+
+.kanban-table-timer-start:not(.disabled):hover {
+	background-color: rgba(var(--color-green-rgb, 76, 175, 80), 0.1);
+}
+
+.kanban-table-timer-stop:not(.disabled) {
+	color: var(--color-red);
+}
+
+.kanban-table-timer-stop:not(.disabled):hover {
+	background-color: rgba(var(--color-red-rgb, 244, 67, 54), 0.1);
+}
+
+.kanban-table-timer-button.disabled {
+	opacity: 0.3;
+	cursor: not-allowed;
+}
+
+.kanban-table-timer-button svg {
+	width: 12px;
+	height: 12px;
 }
 
 @keyframes timer-blink {

@@ -1493,7 +1493,8 @@ export function renderKanban(
 				{ label: "Name", field: "title" as SortField },
 				{ label: "Due Date", field: "dueDate" as SortField },
 				{ label: "Time Spent", field: "timeSpent" as SortField },
-				{ label: "Last Updated", field: "updateDateTime" as SortField }
+				{ label: "Last Updated", field: "updateDateTime" as SortField },
+				{ label: "", field: null } // Actions column for timer buttons
 			];
 			
 			headers.forEach(header => {
@@ -1584,25 +1585,117 @@ export function renderKanban(
 				row.setAttr("data-task", task.task);
 				row.setAttr("data-status", status);
 				
+				// Add running class if timer is active
+				if (isTaskTimerRunning(task)) {
+					row.addClass("timer-running");
+				}
+				
 				// Store task element mapping
 				taskElements.set(row, { task, status });
 				
 				// Set up drag handlers
 				setupTaskDragHandlers(row, status);
 				
-				// Task name cell with inline tags
+				// Task name cell with status button and inline tags
 				const nameCell = row.createEl("td", { cls: "kanban-table-cell-name" });
+				
+				// Status button container
+				const statusButtonContainer = nameCell.createDiv("kanban-table-status-button-container");
+				const statusButton = statusButtonContainer.createEl("button", { 
+					cls: "kanban-table-status-button",
+					attr: { "aria-label": "Change status" }
+				});
+				
+				// Function to update status button icon based on column state
+				const updateStatusButtonIcon = () => {
+					const columnState = getColumnState(status);
+					if (columnState === "todo") {
+						statusButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>';
+						statusButton.className = "kanban-table-status-button status-todo";
+					} else if (columnState === "in-progress") {
+						statusButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
+						statusButton.className = "kanban-table-status-button status-in-progress";
+					} else {
+						statusButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="9 12 11 14 15 10"></polyline></svg>';
+						statusButton.className = "kanban-table-status-button status-done";
+					}
+				};
+				
+				updateStatusButtonIcon();
+				
+				// Status button click handler - show menu with all statuses
+				statusButton.addEventListener("click", (e) => {
+					e.stopPropagation();
+					
+					const menu = new Menu();
+					
+					// Add menu item for each status
+					statusColumns.forEach(targetStatus => {
+						const displayName = statusToDisplayName(targetStatus);
+						const targetColumnState = getColumnState(targetStatus);
+						
+						// Determine icon
+						let icon = "circle";
+						if (targetColumnState === "in-progress") {
+							icon = "clock";
+						} else if (targetColumnState === "done") {
+							icon = "check-circle";
+						}
+						
+						menu.addItem((item) => {
+							item
+								.setTitle(displayName)
+								.setIcon(icon)
+								.setChecked(targetStatus === status)
+								.onClick(async () => {
+									if (targetStatus === status) {
+										console.log("Kanban: Task already in status", status);
+										return;
+									}
+									
+									// Update task status
+									task.status = targetStatus;
+									task.updateDateTime = moment().toISOString();
+									
+									// Update tasksByStatus map
+									const oldStatusTasks = tasksByStatus.get(status) || [];
+									const filteredOldTasks = oldStatusTasks.filter(t => t.task !== task.task);
+									tasksByStatus.set(status, filteredOldTasks);
+									
+									const newStatusTasks = tasksByStatus.get(targetStatus) || [];
+									newStatusTasks.push(task);
+									tasksByStatus.set(targetStatus, newStatusTasks);
+									
+									// Remove from taskElements
+									taskElements.delete(row);
+									
+									// Re-render table view
+									renderTableView();
+									
+									// Save changes
+									await saveTasksToFile(task.task);
+									
+									console.log("Kanban: Changed task status from", status, "to", targetStatus);
+								});
+						});
+					});
+					
+					menu.showAtMouseEvent(e);
+				});
+				
+				// Task name content
+				const taskNameContent = nameCell.createDiv("kanban-table-task-content");
 				MarkdownRenderer.render(
 					plugin.app,
 					task.task,
-					nameCell,
+					taskNameContent,
 					ctx.sourcePath,
 					component
 				).then(() => {
-					const paragraph = nameCell.querySelector("p");
+					const paragraph = taskNameContent.querySelector("p");
 					if (paragraph) {
 						while (paragraph.firstChild) {
-							nameCell.appendChild(paragraph.firstChild);
+							taskNameContent.appendChild(paragraph.firstChild);
 						}
 						paragraph.remove();
 					}
@@ -1610,7 +1703,7 @@ export function renderKanban(
 					// Add tags inline after the task name
 					if (task.tags && task.tags.length > 0) {
 						task.tags.forEach(tag => {
-							const tagEl = nameCell.createSpan("kanban-tag");
+							const tagEl = taskNameContent.createSpan("kanban-tag");
 							tagEl.setText(tag);
 						});
 					}
@@ -1634,15 +1727,40 @@ export function renderKanban(
 				
 				// Time spent cell
 				const timeSpentCell = row.createEl("td", { cls: "kanban-table-cell-time-spent" });
-				const totalDuration = getTaskTimerDuration(task);
-				if (totalDuration > 0) {
-					timeSpentCell.setText(formatTimerDuration(totalDuration));
-					if (isTaskTimerRunning(task)) {
-						timeSpentCell.addClass("running");
+				const timeDisplay = timeSpentCell.createSpan("kanban-table-time-display");
+				
+				// Function to update timer display
+				const updateTimerDisplay = () => {
+					const totalDuration = getTaskTimerDuration(task);
+					const isRunning = isTaskTimerRunning(task);
+					
+					if (totalDuration > 0) {
+						timeDisplay.setText(formatTimerDuration(totalDuration));
+						timeDisplay.removeClass("empty");
+					} else {
+						timeDisplay.setText("—");
+						timeDisplay.addClass("empty");
 					}
-				} else {
-					timeSpentCell.setText("—");
-				}
+					
+					// Update button states and row visual state
+					if (isRunning) {
+						startButton.disabled = true;
+						stopButton.disabled = false;
+						startButton.addClass("disabled");
+						stopButton.removeClass("disabled");
+						timeSpentCell.addClass("running");
+						actionsCell.addClass("running");
+						row.addClass("timer-running");
+					} else {
+						startButton.disabled = false;
+						stopButton.disabled = true;
+						startButton.removeClass("disabled");
+						stopButton.addClass("disabled");
+						timeSpentCell.removeClass("running");
+						actionsCell.removeClass("running");
+						row.removeClass("timer-running");
+					}
+				};
 				
 				// Last updated cell
 				const updatedCell = row.createEl("td", { cls: "kanban-table-cell-updated" });
@@ -1652,6 +1770,63 @@ export function renderKanban(
 				} else {
 					updatedCell.setText("—");
 				}
+				
+				// Actions cell with timer buttons
+				const actionsCell = row.createEl("td", { cls: "kanban-table-cell-actions" });
+				const timerButtons = actionsCell.createDiv("kanban-table-timer-buttons");
+				
+				// Start button
+				const startButton = timerButtons.createEl("button", {
+					cls: "kanban-table-timer-button kanban-table-timer-start",
+					attr: { "aria-label": "Start timer" }
+				});
+				startButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+				
+				// Stop button
+				const stopButton = timerButtons.createEl("button", {
+					cls: "kanban-table-timer-button kanban-table-timer-stop",
+					attr: { "aria-label": "Stop timer" }
+				});
+				stopButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>`;
+				
+				// Initial display
+				updateTimerDisplay();
+				
+				// Store update function for interval
+				(row as any).updateTimerDisplay = updateTimerDisplay;
+				
+				// Start button click handler
+				startButton.addEventListener("click", async (e) => {
+					e.stopPropagation();
+					
+					// Stop all other running timers
+					taskElements.forEach((info, otherRow) => {
+						if (info.task !== task && isTaskTimerRunning(info.task)) {
+							stopTaskTimer(info.task);
+							// Update the display for the stopped task
+							const updateFn = (otherRow as any).updateTimerDisplay;
+							if (updateFn) {
+								updateFn();
+							}
+							console.log("Kanban: Auto-stopped timer for task:", info.task.task);
+						}
+					});
+					
+					// Start the timer for this task
+					startTaskTimer(task);
+					updateTimerDisplay();
+					
+					// Save changes to file
+					await saveTasksToFile(task.task);
+				});
+				
+				// Stop button click handler
+				stopButton.addEventListener("click", async (e) => {
+					e.stopPropagation();
+					stopTaskTimer(task);
+					updateTimerDisplay();
+					await saveTasksToFile(task.task);
+				});
 				
 				// Row context menu
 				row.addEventListener("contextmenu", (e) => {
@@ -1767,7 +1942,7 @@ export function renderKanban(
 					const indicator = document.createElement("tr");
 					indicator.className = "kanban-table-drop-indicator";
 					const td = indicator.createEl("td");
-					td.setAttribute("colspan", "4");
+					td.setAttribute("colspan", "5");
 					
 					if (insertBefore) {
 						row.parentElement?.insertBefore(indicator, row);
@@ -1826,26 +2001,38 @@ export function renderKanban(
 				if (sourceStatus === status && draggedOverRow) {
 					// Reordering within same status
 					const targetTaskName = draggedOverRow.getAttribute("data-task");
-					const statusTasks = tasksByStatus.get(status) || [];
 					
-					// Remove the moved task from its current position
-					const filteredTasks = statusTasks.filter(t => t.task !== taskText);
-					
-					// Find the target index
-					const targetIndex = filteredTasks.findIndex(t => t.task === targetTaskName);
-					
-					if (targetIndex >= 0) {
-						// Insert at the correct position
-						const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
-						filteredTasks.splice(insertIndex, 0, movedTask.task);
-						tasksByStatus.set(status, filteredTasks);
-					} else {
-						// Fallback: add at the end
-						filteredTasks.push(movedTask.task);
-						tasksByStatus.set(status, filteredTasks);
+					// Don't do anything if dropping on itself
+					if (targetTaskName === taskText) {
+						console.log("Kanban: Dropped task on itself, ignoring");
+						draggedOverRow = null;
+						renderTableView();
+						return;
 					}
 					
-					console.log("Kanban: Reordered task", taskText, "within", status);
+					const statusTasks = tasksByStatus.get(status) || [];
+					
+					// Find original indices
+					const sourceIndex = statusTasks.findIndex(t => t.task === taskText);
+					const targetIndexOriginal = statusTasks.findIndex(t => t.task === targetTaskName);
+					
+					if (sourceIndex < 0 || targetIndexOriginal < 0) {
+						console.warn("Kanban: Could not find source or target task in array");
+						return;
+					}
+					
+					// Remove the moved task from its current position
+					const [movedTaskObj] = statusTasks.splice(sourceIndex, 1);
+					
+					// Recalculate target index after removal
+					const newTargetIndex = statusTasks.findIndex(t => t.task === targetTaskName);
+					
+					// Insert at the correct position
+					const insertIndex = insertBefore ? newTargetIndex : newTargetIndex + 1;
+					statusTasks.splice(insertIndex, 0, movedTaskObj);
+					tasksByStatus.set(status, statusTasks);
+					
+					console.log("Kanban: Reordered task", taskText, "within", status, "from index", sourceIndex, "to", insertIndex);
 				} else {
 					// Moving to different status
 					const oldStatusTasks = tasksByStatus.get(sourceStatus) || [];
@@ -1857,13 +2044,21 @@ export function renderKanban(
 					if (draggedOverRow) {
 						// Insert at specific position
 						const targetTaskName = draggedOverRow.getAttribute("data-task");
-						const targetIndex = newStatusTasks.findIndex(t => t.task === targetTaskName);
 						
-						if (targetIndex >= 0) {
-							const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
-							newStatusTasks.splice(insertIndex, 0, movedTask.task);
+						// Safety check - don't insert if target is the same task
+						if (targetTaskName === taskText) {
+							if (!newStatusTasks.find(t => t.task === taskText)) {
+								newStatusTasks.push(movedTask.task);
+							}
 						} else {
-							newStatusTasks.push(movedTask.task);
+							const targetIndex = newStatusTasks.findIndex(t => t.task === targetTaskName);
+							
+							if (targetIndex >= 0) {
+								const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
+								newStatusTasks.splice(insertIndex, 0, movedTask.task);
+							} else {
+								newStatusTasks.push(movedTask.task);
+							}
 						}
 					} else {
 						// Add at the end if no specific position
@@ -1955,7 +2150,13 @@ export function renderKanban(
 		const getColumnMetadata = () => {
 			let metadata = data.columnMetadata?.find(m => m.name === status);
 			if (!metadata) {
-				metadata = { name: status, state: "todo", sortField: "updateDateTime", sortOrder: "desc" };
+				metadata = { 
+					name: status, 
+					state: "todo", 
+					sortField: "updateDateTime", 
+					sortOrder: "desc",
+					manualSort: true // Default to manual sort to preserve task order
+				};
 				if (!data.columnMetadata) {
 					data.columnMetadata = [];
 				}
@@ -1963,6 +2164,7 @@ export function renderKanban(
 			}
 			if (!metadata.sortField) metadata.sortField = "updateDateTime";
 			if (!metadata.sortOrder) metadata.sortOrder = "desc";
+			if (metadata.manualSort === undefined) metadata.manualSort = true; // Default to manual sort
 			return metadata;
 		};
 		
@@ -1983,10 +2185,19 @@ export function renderKanban(
 				"title": "Title",
 				"timeSpent": "Time"
 			};
-			sortFieldButton.innerHTML = `${fieldIcons[metadata.sortField!]} ${fieldLabels[metadata.sortField!]}`;
 			
-			// Update order button
+			// Show manual sort indicator or regular sort field
+			if (metadata.manualSort) {
+				sortFieldButton.innerHTML = `✋ Manual`;
+				sortFieldButton.style.opacity = "0.6";
+			} else {
+				sortFieldButton.innerHTML = `${fieldIcons[metadata.sortField!]} ${fieldLabels[metadata.sortField!]}`;
+				sortFieldButton.style.opacity = "1";
+			}
+			
+			// Update order button - dim when in manual mode
 			sortOrderButton.innerHTML = metadata.sortOrder === "asc" ? "↑" : "↓";
+			sortOrderButton.style.opacity = metadata.manualSort ? "0.6" : "1";
 		};
 		
 		updateSortButtons();
@@ -1998,6 +2209,7 @@ export function renderKanban(
 			const fields: SortField[] = ["updateDateTime", "dueDate", "title", "timeSpent"];
 			const currentIndex = fields.indexOf(metadata.sortField!);
 			metadata.sortField = fields[(currentIndex + 1) % fields.length];
+			metadata.manualSort = false; // Disable manual sort when user clicks sort button
 			updateSortButtons();
 			sortAndRenderTasks();
 			await saveCollapsedState();
@@ -2009,6 +2221,7 @@ export function renderKanban(
 			e.stopPropagation();
 			const metadata = getColumnMetadata();
 			metadata.sortOrder = metadata.sortOrder === "asc" ? "desc" : "asc";
+			metadata.manualSort = false; // Disable manual sort when user clicks sort button
 			updateSortButtons();
 			sortAndRenderTasks();
 			await saveCollapsedState();
@@ -2168,21 +2381,15 @@ export function renderKanban(
 		
 		// Function to sort and render tasks
 		const sortAndRenderTasks = () => {
-			// Get current tasks - check taskElements first (for re-sorting with updated data)
-			let currentTasks: KanbanTask[] = [];
-			taskElements.forEach((info, el) => {
-				// Only include tasks from this column
-				if (info.status === status) {
-					currentTasks.push(info.task);
-				}
-			});
+			// Always use tasksByStatus as the source of truth for task order
+			const currentTasks = tasksByStatus.get(status) || [];
 			
-			// If no tasks found in taskElements (initial render), use tasksByStatus
-			if (currentTasks.length === 0) {
-				currentTasks = tasksByStatus.get(status) || [];
-			}
+			// Check if manual sorting is enabled for this column
+			const metadata = getColumnMetadata();
+			const useManualSort = metadata.manualSort === true;
 			
-			const sortedTasks = sortTasks(currentTasks);
+			// Sort tasks only if manual sort is not enabled
+			const tasksToRender = useManualSort ? currentTasks : sortTasks(currentTasks);
 			
 			// Remove old task elements from the taskElements Map
 			const oldElements = Array.from(tasksEl.children);
@@ -2195,8 +2402,8 @@ export function renderKanban(
 			// Clear existing tasks from DOM
 			tasksEl.empty();
 			
-			// Render sorted tasks
-			sortedTasks.forEach(task => {
+			// Render tasks (sorted or manual order)
+			tasksToRender.forEach(task => {
 				// Update task status to match the column name (handles case normalization)
 				task.status = status;
 				createTaskElement(task, status, tasksEl);
@@ -2234,22 +2441,68 @@ export function renderKanban(
 			// Remove drop indicators from all columns
 			columnElements.forEach((colEl) => {
 				colEl.classList.remove("kanban-column-drag-over");
+				const tasksEl = colEl.querySelector(".kanban-column-tasks");
+				if (tasksEl) {
+					tasksEl.querySelectorAll(".kanban-drop-indicator").forEach(el => el.remove());
+				}
 			});
 		});
 	}
 	
-	// Set up drop handlers for columns
+	// Set up drop handlers for columns - supports both reordering and moving between columns
 	function setupColumnDropHandlers(tasksContainer: HTMLElement, targetStatus: KanbanStatus) {
+		let draggedOverTask: HTMLElement | null = null;
+		let insertBefore = true;
+		
 		tasksContainer.addEventListener("dragover", (e: DragEvent) => {
 			e.preventDefault();
 			if (!e.dataTransfer) return;
 			
 			e.dataTransfer.dropEffect = "move";
 			
-			// Add visual feedback
-			const columnEl = tasksContainer.parentElement;
-			if (columnEl) {
-				columnEl.classList.add("kanban-column-drag-over");
+			// Find the task being dragged over
+			const target = e.target as HTMLElement;
+			const taskCard = target.closest(".kanban-task") as HTMLElement;
+			
+			if (taskCard && taskCard.parentElement === tasksContainer) {
+				// Remove previous indicators
+				tasksContainer.querySelectorAll(".kanban-drop-indicator").forEach(el => el.remove());
+				
+				// Determine if we should insert before or after based on mouse position
+				const rect = taskCard.getBoundingClientRect();
+				
+				// For vertical view: check vertical position
+				// For horizontal view: check horizontal position
+				const isVerticalLayout = tasksContainer.classList.contains("kanban-column-tasks") && 
+					tasksContainer.style.flexDirection !== "row";
+				
+				if (isVerticalLayout || data.view === "vertical") {
+					// Vertical layout: use Y position
+					const midpoint = rect.top + rect.height / 2;
+					insertBefore = e.clientY < midpoint;
+				} else {
+					// Horizontal layout: use X position
+					const midpoint = rect.left + rect.width / 2;
+					insertBefore = e.clientX < midpoint;
+				}
+				
+				// Add visual indicator
+				const indicator = document.createElement("div");
+				indicator.className = "kanban-drop-indicator";
+				
+				if (insertBefore) {
+					taskCard.parentElement?.insertBefore(indicator, taskCard);
+				} else {
+					taskCard.parentElement?.insertBefore(indicator, taskCard.nextSibling);
+				}
+				
+				draggedOverTask = taskCard;
+			} else {
+				// Dragging over empty space - highlight column
+				const columnEl = tasksContainer.parentElement;
+				if (columnEl) {
+					columnEl.classList.add("kanban-column-drag-over");
+				}
 			}
 		});
 		
@@ -2257,26 +2510,24 @@ export function renderKanban(
 			const columnEl = tasksContainer.parentElement;
 			if (columnEl && !columnEl.contains(e.relatedTarget as Node)) {
 				columnEl.classList.remove("kanban-column-drag-over");
+				tasksContainer.querySelectorAll(".kanban-drop-indicator").forEach(el => el.remove());
+				draggedOverTask = null;
 			}
 		});
 		
-		tasksContainer.addEventListener("drop", (e: DragEvent) => {
+		tasksContainer.addEventListener("drop", async (e: DragEvent) => {
 			e.preventDefault();
 			if (!e.dataTransfer) return;
 			
-			const sourceStatus = e.dataTransfer.getData("application/x-kanban-status") as KanbanStatus;
-			const taskText = e.dataTransfer.getData("text/plain");
-			
-			// Remove visual feedback
+			// Clean up visual indicators
 			const columnEl = tasksContainer.parentElement;
 			if (columnEl) {
 				columnEl.classList.remove("kanban-column-drag-over");
 			}
+			tasksContainer.querySelectorAll(".kanban-drop-indicator").forEach(el => el.remove());
 			
-			// If dropped in the same status column, do nothing
-			if (sourceStatus === targetStatus) {
-				return;
-			}
+			const sourceStatus = e.dataTransfer.getData("application/x-kanban-status") as KanbanStatus;
+			const taskText = e.dataTransfer.getData("text/plain");
 			
 			// Find the task element in the source column
 			const sourceColumnEl = columnElements.get(sourceStatus);
@@ -2291,29 +2542,139 @@ export function renderKanban(
 			
 			if (!taskEl) return;
 			
-			// Move the task element to the new column
-			taskEl.setAttribute("data-status", targetStatus);
-			tasksContainer.appendChild(taskEl);
-			
-			// Update the stored task information with new status
+			// Get task info
 			const taskInfo = taskElements.get(taskEl);
-			if (taskInfo) {
-				// Update both the status in the info and the task object
-				taskInfo.status = targetStatus;
-				taskInfo.task.status = targetStatus;
+			if (!taskInfo) {
+				console.warn("Kanban: Could not find task info for:", taskText);
+				return;
+			}
+			
+			// Handle reordering within same column or moving to different column
+			if (sourceStatus === targetStatus && draggedOverTask) {
+				// Reordering within same column
+				const targetTaskName = draggedOverTask.getAttribute("data-task");
 				
-				// Update only the update datetime when moving between statuses
-				const currentDateTime = moment().toISOString();
-				taskInfo.task.updateDateTime = currentDateTime;
-				console.log("Kanban: Updated update datetime:", currentDateTime);
+				// Don't do anything if dropping on itself
+				if (targetTaskName === taskText) {
+					console.log("Kanban: Dropped task on itself, ignoring");
+					draggedOverTask = null;
+					return;
+				}
 				
-				// Update the update datetime display if the update function exists
+				const statusTasks = tasksByStatus.get(targetStatus) || [];
+				
+				// Find original indices
+				const sourceIndex = statusTasks.findIndex(t => t.task === taskText);
+				const targetIndexOriginal = statusTasks.findIndex(t => t.task === targetTaskName);
+				
+				if (sourceIndex < 0 || targetIndexOriginal < 0) {
+					console.warn("Kanban: Could not find source or target task in array");
+					return;
+				}
+				
+				// Remove the moved task from its current position
+				const [movedTaskObj] = statusTasks.splice(sourceIndex, 1);
+				
+				// Recalculate target index after removal
+				const newTargetIndex = statusTasks.findIndex(t => t.task === targetTaskName);
+				
+				// Insert at the correct position
+				const insertIndex = insertBefore ? newTargetIndex : newTargetIndex + 1;
+				statusTasks.splice(insertIndex, 0, movedTaskObj);
+				tasksByStatus.set(targetStatus, statusTasks);
+				
+				// Enable manual sort for this column
+				const metadata = data.columnMetadata?.find(m => m.name === targetStatus);
+				if (metadata) {
+					metadata.manualSort = true;
+					console.log("Kanban: Enabled manual sort for column", targetStatus);
+				}
+				
+				// Move DOM element
+				if (insertBefore) {
+					draggedOverTask.parentElement?.insertBefore(taskEl, draggedOverTask);
+				} else {
+					const nextElement = draggedOverTask.nextSibling;
+					if (nextElement) {
+						draggedOverTask.parentElement?.insertBefore(taskEl, nextElement);
+					} else {
+						draggedOverTask.parentElement?.appendChild(taskEl);
+					}
+				}
+				
+				// Update timestamp
+				taskInfo.task.updateDateTime = moment().toISOString();
 				const updateDateTimeUpdateFn = (taskEl as any).updateUpdateDateTimeDisplay;
 				if (updateDateTimeUpdateFn) {
 					updateDateTimeUpdateFn();
 				}
 				
+				console.log("Kanban: Reordered task", taskText, "within", targetStatus, "from index", sourceIndex, "to", insertIndex);
+				
+				// Save changes
+				await saveTasksToFile(taskText);
+			} else {
+				// Moving to different column
+				taskEl.setAttribute("data-status", targetStatus);
+				
+				// Update task info
+				taskInfo.status = targetStatus;
+				taskInfo.task.status = targetStatus;
+				taskInfo.task.updateDateTime = moment().toISOString();
+				
 				console.log("Kanban: Updating task", taskText, "to status", targetStatus);
+				
+				// Update tasksByStatus map
+				const oldStatusTasks = tasksByStatus.get(sourceStatus) || [];
+				const filteredOldTasks = oldStatusTasks.filter(t => t.task !== taskText);
+				tasksByStatus.set(sourceStatus, filteredOldTasks);
+				
+				const newStatusTasks = tasksByStatus.get(targetStatus) || [];
+				
+				if (draggedOverTask) {
+					// Insert at specific position
+					const targetTaskName = draggedOverTask.getAttribute("data-task");
+					
+					// Don't insert if target is the same task (shouldn't happen but safety check)
+					if (targetTaskName === taskText) {
+						newStatusTasks.push(taskInfo.task);
+						tasksContainer.appendChild(taskEl);
+					} else {
+						const targetIndex = newStatusTasks.findIndex(t => t.task === targetTaskName);
+						
+						if (targetIndex >= 0) {
+							const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
+							newStatusTasks.splice(insertIndex, 0, taskInfo.task);
+							
+							// Move DOM element
+							if (insertBefore) {
+								draggedOverTask.parentElement?.insertBefore(taskEl, draggedOverTask);
+							} else {
+								const nextElement = draggedOverTask.nextSibling;
+								if (nextElement) {
+									draggedOverTask.parentElement?.insertBefore(taskEl, nextElement);
+								} else {
+									draggedOverTask.parentElement?.appendChild(taskEl);
+								}
+							}
+						} else {
+							newStatusTasks.push(taskInfo.task);
+							tasksContainer.appendChild(taskEl);
+						}
+					}
+				} else {
+					// Add at the end
+					newStatusTasks.push(taskInfo.task);
+					tasksContainer.appendChild(taskEl);
+				}
+				
+				tasksByStatus.set(targetStatus, newStatusTasks);
+				
+				// Update the update datetime display
+				const updateDateTimeUpdateFn = (taskEl as any).updateUpdateDateTimeDisplay;
+				if (updateDateTimeUpdateFn) {
+					updateDateTimeUpdateFn();
+				}
 				
 				// Handle automatic timer control based on column state
 				const newColumnState = getColumnState(targetStatus);
@@ -2323,7 +2684,6 @@ export function renderKanban(
 					taskElements.forEach((info, otherTaskEl) => {
 						if (info.task !== taskInfo.task && isTaskTimerRunning(info.task)) {
 							stopTaskTimer(info.task);
-							// Update the display for the stopped task
 							const updateFn = (otherTaskEl as any).updateTimerDisplay;
 							if (updateFn) {
 								updateFn();
@@ -2354,13 +2714,12 @@ export function renderKanban(
 					}
 				}
 				
-				// Update the file with the new status
-				saveTasksToFile(taskText).catch(err => {
-					console.error("Error saving task status change:", err);
-				});
-			} else {
-				console.warn("Kanban: Could not find task info for:", taskText);
+				// Save changes
+				await saveTasksToFile(taskText);
 			}
+			
+			// Reset
+			draggedOverTask = null;
 		});
 	}
 	

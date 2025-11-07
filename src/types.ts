@@ -10,6 +10,7 @@ export interface ColumnMetadata {
 	state: ColumnState;
 	sortField?: SortField;
 	sortOrder?: SortOrder;
+	manualSort?: boolean; // If true, preserve manual task order instead of auto-sorting
 }
 
 export interface TimerEntry {
