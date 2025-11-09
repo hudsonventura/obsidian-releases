@@ -2697,6 +2697,9 @@ export function renderKanban(
 				
 				if (!movedTask || !movedTaskEl) return;
 				
+				// Store movedTask in a const to help TypeScript
+				const taskToMove = movedTask;
+				
 				// Remove the old element from DOM and taskElements
 				taskElements.delete(movedTaskEl);
 				movedTaskEl.remove();
@@ -2706,9 +2709,9 @@ export function renderKanban(
 				const newColumnState = getColumnState(status);
 				
 				// Update task status
-				movedTask.task.status = status;
-				movedTask.task.updateDateTime = moment().toISOString();
-				movedTask.status = status;
+				taskToMove.task.status = status;
+				taskToMove.task.updateDateTime = moment().toISOString();
+				taskToMove.status = status;
 				
 				// Timer logic: Start timer if moving to in-progress, stop if moving away
 				if (sourceStatus !== status) {
@@ -2723,16 +2726,26 @@ export function renderKanban(
 							}
 						});
 						
+						// Also stop timers in tasksByStatus (in case taskElements is out of sync)
+						tasksByStatus.forEach((tasks) => {
+							tasks.forEach((t) => {
+								if (t.task !== taskToMove.task.task && isTaskTimerRunning(t)) {
+									stopTaskTimer(t);
+									console.log("Kanban: Auto-stopped timer for task (from tasksByStatus):", t.task);
+								}
+							});
+						});
+						
 						// Start timer for this task if not already running
-						if (!isTaskTimerRunning(movedTask.task)) {
-							startTaskTimer(movedTask.task);
-							console.log("Kanban: Auto-started timer for task:", movedTask.task.task);
+						if (!isTaskTimerRunning(taskToMove.task)) {
+							startTaskTimer(taskToMove.task);
+							console.log("Kanban: Auto-started timer for task:", taskToMove.task.task, "Timer entries:", taskToMove.task.timerEntries);
 						}
 					} else if (oldColumnState === "in-progress") {
 						// Moving away from in-progress - stop timer
-						if (isTaskTimerRunning(movedTask.task)) {
-							stopTaskTimer(movedTask.task);
-							console.log("Kanban: Auto-stopped timer for task:", movedTask.task.task);
+						if (isTaskTimerRunning(taskToMove.task)) {
+							stopTaskTimer(taskToMove.task);
+							console.log("Kanban: Auto-stopped timer for task:", taskToMove.task.task);
 						}
 					}
 				}
@@ -2788,23 +2801,47 @@ export function renderKanban(
 						
 						// Safety check - don't insert if target is the same task
 						if (targetTaskName === taskText) {
-							if (!newStatusTasks.find(t => t.task === taskText)) {
-								newStatusTasks.push(movedTask.task);
+							const existingIndex = newStatusTasks.findIndex(t => t.task === taskText);
+							if (existingIndex >= 0) {
+								// Update existing task with timer state
+								newStatusTasks[existingIndex] = taskToMove.task;
+							} else {
+								newStatusTasks.push(taskToMove.task);
 							}
 						} else {
 							const targetIndex = newStatusTasks.findIndex(t => t.task === targetTaskName);
 							
 							if (targetIndex >= 0) {
 								const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
-								newStatusTasks.splice(insertIndex, 0, movedTask.task);
+								// Remove existing task if it exists, then insert at correct position
+								const existingIndex = newStatusTasks.findIndex(t => t.task === taskText);
+								if (existingIndex >= 0) {
+									newStatusTasks.splice(existingIndex, 1);
+									// Recalculate target index after removal
+									const newTargetIndex = newStatusTasks.findIndex(t => t.task === targetTaskName);
+									const finalInsertIndex = insertBefore ? newTargetIndex : newTargetIndex + 1;
+									newStatusTasks.splice(finalInsertIndex, 0, taskToMove.task);
+								} else {
+									newStatusTasks.splice(insertIndex, 0, taskToMove.task);
+								}
 							} else {
-								newStatusTasks.push(movedTask.task);
+								// Remove existing task if it exists, then add
+								const existingIndex = newStatusTasks.findIndex(t => t.task === taskText);
+								if (existingIndex >= 0) {
+									newStatusTasks[existingIndex] = taskToMove.task;
+								} else {
+									newStatusTasks.push(taskToMove.task);
+								}
 							}
 						}
 					} else {
 						// Add at the end if no specific position
-						if (!newStatusTasks.find(t => t.task === taskText)) {
-							newStatusTasks.push(movedTask.task);
+						const existingIndex = newStatusTasks.findIndex(t => t.task === taskText);
+						if (existingIndex >= 0) {
+							// Update existing task with timer state
+							newStatusTasks[existingIndex] = taskToMove.task;
+						} else {
+							newStatusTasks.push(taskToMove.task);
 						}
 					}
 					
