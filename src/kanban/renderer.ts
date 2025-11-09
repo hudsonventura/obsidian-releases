@@ -2768,13 +2768,12 @@ export function renderKanban(
 				const oldColumnState = getColumnState(sourceStatus);
 				const newColumnState = getColumnState(status);
 				
-				// Update task status
-				taskToMove.task.status = status;
-				taskToMove.task.updateDateTime = moment().toISOString();
-				taskToMove.status = status;
-				
 				// Timer logic: Start timer if moving to in-progress, stop if moving away
 				if (sourceStatus !== status) {
+					// Only update task status if moving to a different status
+					taskToMove.task.status = status;
+					taskToMove.task.updateDateTime = moment().toISOString();
+					taskToMove.status = status;
 					// Only apply timer logic when actually changing status
 					if (newColumnState === "in-progress") {
 						// Moving to in-progress - start timer
@@ -2812,7 +2811,7 @@ export function renderKanban(
 				
 				// Handle reordering within same status or moving to different status
 				if (sourceStatus === status && draggedOverRow) {
-					// Reordering within same status
+					// Reordering within same status - don't change status or updateDateTime
 					const targetTaskName = draggedOverRow.getAttribute("data-task");
 					
 					// Don't do anything if dropping on itself
@@ -2847,7 +2846,7 @@ export function renderKanban(
 					tasksByStatus.set(status, statusTasks);
 					
 					console.log("Kanban: Reordered task", taskText, "within", status, "from index", sourceIndex, "to", insertIndex);
-				} else {
+				} else if (sourceStatus !== status) {
 					// Moving to different status
 					const oldStatusTasks = tasksByStatus.get(sourceStatus) || [];
 					const filteredOldTasks = oldStatusTasks.filter(t => t.task !== taskText);
@@ -3722,13 +3721,7 @@ export function renderKanban(
 					}
 				}
 				
-				// Update timestamp
-				taskInfo.task.updateDateTime = moment().toISOString();
-				const updateDateTimeUpdateFn = (taskEl as any).updateUpdateDateTimeDisplay;
-				if (updateDateTimeUpdateFn) {
-					updateDateTimeUpdateFn();
-				}
-				
+				// Don't update timestamp or status when reordering within same column
 				console.log("Kanban: Reordered task", taskText, "within", targetStatus, "from index", sourceIndex, "to", insertIndex);
 				
 				// Save changes
