@@ -1453,27 +1453,45 @@ export function renderKanban(
 			
 		// Find the first column with state "todo", otherwise use first available column
 		const firstStatus = statusColumns[0];
-		let targetColumn: HTMLElement | undefined;
 		let targetStatus: KanbanStatus = firstStatus;
 		
 		// Look for the first column with state "todo"
 		for (const status of statusColumns) {
 			const columnState = getColumnState(status);
 			if (columnState === "todo") {
-				targetColumn = columnElements.get(status);
 				targetStatus = status;
 				break;
 			}
 		}
 		
 		// If no column has state "todo", use the first column
-		if (!targetColumn && firstStatus) {
-			targetColumn = columnElements.get(firstStatus);
+		if (!targetStatus && firstStatus) {
 			targetStatus = firstStatus;
 		}
+		
+		if (!targetStatus) {
+			console.error("Kanban: Could not find any status to add task");
+			return;
+		}
+		
+		// Set the task status
+		newTask.status = targetStatus;
+		
+		// Handle different view modes
+		if (data.view === "table") {
+			// For table view, add task to tasksByStatus and re-render
+			const tasks = tasksByStatus.get(targetStatus) || [];
+			tasks.push(newTask);
+			tasksByStatus.set(targetStatus, tasks);
 			
+			// Re-render table view
+			renderTableView();
+			setTimeout(() => applyFilter(), 0);
+		} else {
+			// For kanban view (horizontal/vertical), find the column element
+			const targetColumn = columnElements.get(targetStatus);
 			if (!targetColumn) {
-				console.error("Kanban: Could not find any column to add task");
+				console.error("Kanban: Could not find column element for status:", targetStatus);
 				return;
 			}
 			
@@ -1483,9 +1501,6 @@ export function renderKanban(
 				return;
 			}
 			
-			// Set the task status to the target column
-			newTask.status = targetStatus;
-			
 			// Create and add the task element
 			const taskEl = createTaskElement(newTask, targetStatus, tasksContainer);
 			
@@ -1494,11 +1509,12 @@ export function renderKanban(
 				console.error("Kanban: Failed to add task to taskElements map");
 				return;
 			}
-			
-			// Update the file
-			await saveTasksToFile();
-			
-			console.log("Kanban: Created new task:", newTask.task, "in column:", targetStatus);
+		}
+		
+		// Update the file
+		await saveTasksToFile();
+		
+		console.log("Kanban: Created new task:", newTask.task, "in column:", targetStatus);
 		});
 		modal.open();
 	});

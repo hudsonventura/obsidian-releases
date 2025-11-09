@@ -17,6 +17,9 @@ export class AddTaskModal extends Modal {
 
 		contentEl.createEl("h2", { text: "Add New Task" });
 
+		// Declare targetTimeInput before it's used
+		let targetTimeInput: any;
+
 		// Task name input
 		let taskNameInput: any;
 		new Setting(contentEl)
@@ -34,14 +37,18 @@ export class AddTaskModal extends Modal {
 				text.inputEl.addEventListener("keydown", (e) => {
 					if (e.key === "Enter") {
 						e.preventDefault();
-						// Move to target time input
-						targetTimeInput.inputEl.focus();
+						// Move to target time input if it exists
+						if (targetTimeInput) {
+							targetTimeInput.inputEl.focus();
+						} else {
+							// If target time input doesn't exist yet, just submit
+							this.submit();
+						}
 					}
 				});
 			});
 
 		// Target time input
-		let targetTimeInput: any;
 		new Setting(contentEl)
 			.setName("Target time")
 			.setDesc("Optional. Set a due time or time estimate (e.g., 2h, 1d, 2025-12-31)")
