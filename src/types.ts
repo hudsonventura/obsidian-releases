@@ -1,6 +1,6 @@
 export type KanbanStatus = string; // Allows custom statuses in addition to default: "todo", "in progress", "done"
 
-export type ColumnState = "todo" | "in-progress" | "done";
+export type ColumnState = "todo" | "in-progress" | "pending" | "done";
 
 export type SortField = "updateDateTime" | "dueDate" | "title" | "timeSpent";
 export type SortOrder = "asc" | "desc";
@@ -8,6 +8,7 @@ export type SortOrder = "asc" | "desc";
 export interface ColumnMetadata {
 	name: string;
 	state: ColumnState;
+	icon?: string; // Icon for the status (emoji or icon name)
 	sortField?: SortField;
 	sortOrder?: SortOrder;
 	manualSort?: boolean; // If true, preserve manual task order instead of auto-sorting

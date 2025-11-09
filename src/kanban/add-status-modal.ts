@@ -1,11 +1,14 @@
 import { Modal, App, Setting } from "obsidian";
+import { ColumnState } from "../types";
 
 export class AddStatusModal extends Modal {
-	private callback: (statusName: string | null) => void;
+	private callback: (statusName: string | null, statusType: ColumnState | null, icon: string | null) => void;
 	private statusName: string = "";
+	private statusType: ColumnState = "todo";
+	private statusIcon: string = "";
 	private existingStatuses: string[];
 
-	constructor(app: App, existingStatuses: string[], callback: (statusName: string | null) => void) {
+	constructor(app: App, existingStatuses: string[], callback: (statusName: string | null, statusType: ColumnState | null, icon: string | null) => void) {
 		super(app);
 		this.existingStatuses = existingStatuses;
 		this.callback = callback;
@@ -44,6 +47,34 @@ export class AddStatusModal extends Modal {
 				});
 			});
 
+		// Status type selection
+		new Setting(contentEl)
+			.setName("Status type")
+			.setDesc("Select the type of status column")
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOption("todo", "Todo")
+					.addOption("in-progress", "In Progress")
+					.addOption("pending", "Pending")
+					.setValue(this.statusType)
+					.onChange((value) => {
+						this.statusType = value as ColumnState;
+					});
+			});
+
+		// Status icon input
+		new Setting(contentEl)
+			.setName("Status icon")
+			.setDesc("Enter an emoji or icon name for this status (e.g., 📋, ⏳, 🔄, or leave empty)")
+			.addText((text) => {
+				text
+					.setPlaceholder("Icon (emoji or icon name)...")
+					.setValue(this.statusIcon)
+					.onChange((value) => {
+						this.statusIcon = value.trim();
+					});
+			});
+
 		// Show existing statuses
 		if (this.existingStatuses.length > 0) {
 			const existingDiv = contentEl.createDiv("existing-statuses");
@@ -75,7 +106,7 @@ export class AddStatusModal extends Modal {
 					.setButtonText("Cancel")
 					.onClick(() => {
 						this.close();
-						this.callback(null);
+						this.callback(null, null, null);
 					})
 			);
 	}
@@ -100,7 +131,7 @@ export class AddStatusModal extends Modal {
 		}
 
 		this.close();
-		this.callback(trimmedStatusName);
+		this.callback(trimmedStatusName, this.statusType, this.statusIcon || null);
 	}
 
 	onClose(): void {
