@@ -1783,25 +1783,85 @@ export function renderKanban(
 								status,
 								currentState,
 								currentIcon,
-								async (newType, newIcon) => {
+								async (newName, newType, newIcon) => {
 									if (newType === null) return; // User cancelled
 									
-									// Get or create metadata
-									let metadata = data.columnMetadata?.find(m => m.name === status);
-									if (!metadata) {
-										metadata = { name: status, state: newType };
-										if (!data.columnMetadata) data.columnMetadata = [];
-										data.columnMetadata.push(metadata);
-									} else {
-										metadata.state = newType;
-										if (newIcon !== null) {
-											metadata.icon = newIcon;
-										} else {
-											delete metadata.icon;
+									const oldStatus = status;
+									let updatedStatus = status;
+									
+									// Handle status name change
+									if (newName && newName !== oldStatus) {
+										updatedStatus = newName as KanbanStatus;
+										
+										// Get tasks from tasksByStatus BEFORE updating anything
+										const oldTasks = tasksByStatus.get(oldStatus) || [];
+										
+										// Update all tasks with the old status to use the new status
+										// Update both in data.tasks and in the tasks array from tasksByStatus
+										oldTasks.forEach(task => {
+											task.status = updatedStatus;
+										});
+										
+										if (data.tasks) {
+											data.tasks.forEach(task => {
+												if (task.status === oldStatus) {
+													task.status = updatedStatus;
+												}
+											});
+										}
+										
+										// Update status name in columns array
+										const statusIndex = data.columns?.indexOf(oldStatus);
+										if (statusIndex !== undefined && statusIndex >= 0 && data.columns) {
+											data.columns[statusIndex] = updatedStatus;
+										}
+										
+										// Update status name in statusColumns array
+										const statusColumnsIndex = statusColumns.indexOf(oldStatus);
+										if (statusColumnsIndex >= 0) {
+											statusColumns[statusColumnsIndex] = updatedStatus;
+										}
+										
+										// Update tasksByStatus map - move tasks from old status to new status
+										tasksByStatus.delete(oldStatus);
+										tasksByStatus.set(updatedStatus, oldTasks);
+									
+									// Update metadata name
+									const oldMetadata = data.columnMetadata?.find(m => m.name === oldStatus);
+									if (oldMetadata) {
+										oldMetadata.name = updatedStatus;
+									}
+									
+									// Update collapsed columns array if status is collapsed
+									if (data.collapsedColumns) {
+										const collapsedIndex = data.collapsedColumns.indexOf(oldStatus);
+										if (collapsedIndex >= 0) {
+											data.collapsedColumns[collapsedIndex] = updatedStatus;
 										}
 									}
 									
-									updateSectionTitle();
+									console.log("Kanban: Renamed status from", oldStatus, "to", updatedStatus);
+								}
+								
+								// Get or create metadata (using updated status name)
+								let metadata = data.columnMetadata?.find(m => m.name === updatedStatus);
+								if (!metadata) {
+									metadata = { name: updatedStatus, state: newType };
+									if (!data.columnMetadata) data.columnMetadata = [];
+									data.columnMetadata.push(metadata);
+								} else {
+									metadata.state = newType;
+									if (newIcon !== null) {
+										metadata.icon = newIcon;
+									} else {
+										delete metadata.icon;
+									}
+								}
+								
+								// Re-render the table view to reflect changes
+								renderTableView();
+									setTimeout(() => applyFilter(), 0);
+									
 									await updateKanbanInFile(plugin.app, ctx, "", "todo", originalSource, data).catch(err => {
 										console.error("Error saving status changes:", err);
 									});
@@ -3135,13 +3195,70 @@ export function renderKanban(
 							status,
 							currentState,
 							currentIcon,
-							async (newType, newIcon) => {
+							async (newName, newType, newIcon) => {
 								if (newType === null) return; // User cancelled
 								
-								// Get or create metadata
-								let metadata = data.columnMetadata?.find(m => m.name === status);
+								const oldStatus = status;
+								let updatedStatus = status;
+								
+								// Handle status name change
+								if (newName && newName !== oldStatus) {
+									updatedStatus = newName as KanbanStatus;
+									
+									// Get tasks from tasksByStatus BEFORE updating anything
+									const oldTasks = tasksByStatus.get(oldStatus) || [];
+									
+									// Update all tasks with the old status to use the new status
+									// Update both in data.tasks and in the tasks array from tasksByStatus
+									oldTasks.forEach(task => {
+										task.status = updatedStatus;
+									});
+									
+									if (data.tasks) {
+										data.tasks.forEach(task => {
+											if (task.status === oldStatus) {
+												task.status = updatedStatus;
+											}
+										});
+									}
+									
+									// Update status name in columns array
+									const statusIndex = data.columns?.indexOf(oldStatus);
+									if (statusIndex !== undefined && statusIndex >= 0 && data.columns) {
+										data.columns[statusIndex] = updatedStatus;
+									}
+									
+									// Update status name in statusColumns array
+									const statusColumnsIndex = statusColumns.indexOf(oldStatus);
+									if (statusColumnsIndex >= 0) {
+										statusColumns[statusColumnsIndex] = updatedStatus;
+									}
+									
+									// Update tasksByStatus map - move tasks from old status to new status
+									tasksByStatus.delete(oldStatus);
+									tasksByStatus.set(updatedStatus, oldTasks);
+									
+									// Update metadata name
+									const oldMetadata = data.columnMetadata?.find(m => m.name === oldStatus);
+									if (oldMetadata) {
+										oldMetadata.name = updatedStatus;
+									}
+									
+									// Update collapsed columns array if status is collapsed
+									if (data.collapsedColumns) {
+										const collapsedIndex = data.collapsedColumns.indexOf(oldStatus);
+										if (collapsedIndex >= 0) {
+											data.collapsedColumns[collapsedIndex] = updatedStatus;
+										}
+									}
+									
+									console.log("Kanban: Renamed status from", oldStatus, "to", updatedStatus);
+								}
+								
+								// Get or create metadata (using updated status name)
+								let metadata = data.columnMetadata?.find(m => m.name === updatedStatus);
 								if (!metadata) {
-									metadata = { name: status, state: newType };
+									metadata = { name: updatedStatus, state: newType };
 									if (!data.columnMetadata) data.columnMetadata = [];
 									data.columnMetadata.push(metadata);
 								} else {
@@ -3153,9 +3270,17 @@ export function renderKanban(
 									}
 								}
 								
+								// Re-render the kanban view to reflect changes
+								if (data.view === "table") {
+									renderTableView();
+									setTimeout(() => applyFilter(), 0);
+								} else {
+									renderKanbanColumns();
+								}
+								
 								updateHeaderTitle();
 								await saveCollapsedState();
-								console.log("Kanban: Updated column", status, "type:", newType, "icon:", newIcon);
+								console.log("Kanban: Updated column", updatedStatus, "type:", newType, "icon:", newIcon);
 							}
 						);
 						modal.open();

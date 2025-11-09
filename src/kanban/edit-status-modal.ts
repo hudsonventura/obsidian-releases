@@ -2,20 +2,22 @@ import { Modal, App, Setting } from "obsidian";
 import { ColumnState } from "../types";
 
 export class EditStatusModal extends Modal {
-	private callback: (statusType: ColumnState | null, icon: string | null) => void;
+	private callback: (newName: string | null, statusType: ColumnState | null, icon: string | null) => void;
 	private statusType: ColumnState;
 	private statusIcon: string;
 	private statusName: string;
+	private newStatusName: string;
 
 	constructor(
 		app: App, 
 		statusName: string,
 		currentType: ColumnState,
 		currentIcon: string | undefined,
-		callback: (statusType: ColumnState | null, icon: string | null) => void
+		callback: (newName: string | null, statusType: ColumnState | null, icon: string | null) => void
 	) {
 		super(app);
 		this.statusName = statusName;
+		this.newStatusName = statusName;
 		this.statusType = currentType;
 		this.statusIcon = currentIcon || "";
 		this.callback = callback;
@@ -28,9 +30,22 @@ export class EditStatusModal extends Modal {
 		contentEl.createEl("h2", { text: `Edit Status: ${this.statusName}` });
 		
 		contentEl.createEl("p", { 
-			text: "Modify the status type and icon for this column.",
+			text: "Modify the status name, type, and icon for this column.",
 			cls: "setting-item-description"
 		});
+
+		// Status name input
+		new Setting(contentEl)
+			.setName("Status name")
+			.setDesc("Change the name of this status column")
+			.addText((text) => {
+				text
+					.setPlaceholder("Status name...")
+					.setValue(this.statusName)
+					.onChange((value) => {
+						this.newStatusName = value.trim();
+					});
+			});
 
 		// Status type selection
 		new Setting(contentEl)
@@ -81,14 +96,19 @@ export class EditStatusModal extends Modal {
 					.setButtonText("Cancel")
 					.onClick(() => {
 						this.close();
-						this.callback(null, null);
+						this.callback(null, null, null);
 					})
 			);
 	}
 
 	private submit(): void {
 		this.close();
-		this.callback(this.statusType, this.statusIcon || null);
+		const newName = this.newStatusName.trim();
+		if (newName && newName !== this.statusName) {
+			this.callback(newName, this.statusType, this.statusIcon || null);
+		} else {
+			this.callback(null, this.statusType, this.statusIcon || null);
+		}
 	}
 
 	onClose(): void {
