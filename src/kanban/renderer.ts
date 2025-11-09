@@ -2263,10 +2263,14 @@ export function renderKanban(
 		if (data.columnWidths?.dueDate) {
 			dueDateCell.style.width = data.columnWidths.dueDate + "px";
 		}
-		if (task.dueDate) {
+		
+		// Function to update due date display
+		const updateDueDateDisplay = () => {
+			if (task.dueDate) {
 				const dueDate = moment(task.dueDate);
 				const now = moment();
 				dueDateCell.setText(dueDate.format("ddd, YYYY-MM-DD HH:mm"));
+				dueDateCell.removeClass("overdue", "soon");
 				
 				if (dueDate.isBefore(now)) {
 					dueDateCell.addClass("overdue");
@@ -2275,7 +2279,32 @@ export function renderKanban(
 				}
 			} else {
 				dueDateCell.setText("—");
+				dueDateCell.removeClass("overdue", "soon");
 			}
+		};
+		updateDueDateDisplay();
+		
+		// Make due date cell editable on double-click
+		dueDateCell.style.cursor = "pointer";
+		dueDateCell.addEventListener("dblclick", (e) => {
+			e.stopPropagation();
+			const modal = new DueDateModal(
+				plugin.app,
+				task.dueDate,
+				async (newDate) => {
+					if (newDate === null) {
+						task.dueDate = undefined;
+					} else {
+						task.dueDate = newDate;
+					}
+					updateDueDateDisplay();
+					renderTableView();
+					setTimeout(() => applyFilter(), 0);
+					await saveTasksToFile(task.task);
+				}
+			);
+			modal.open();
+		});
 				
 		// Last updated cell
 		const updatedCell = row.createEl("td", { cls: "kanban-table-cell-updated" });
@@ -2296,7 +2325,11 @@ export function renderKanban(
 			}
 			const timeDisplay = timeSpentCell.createSpan("kanban-table-time-display");
 				
-				// Function to update timer display
+				// Function to update timer display (will reference buttons defined later)
+				let startButton: HTMLButtonElement;
+				let stopButton: HTMLButtonElement;
+				let actionsCell: HTMLElement;
+				
 				const updateTimerDisplay = () => {
 					const totalDuration = getTaskTimerDuration(task);
 					const isRunning = isTaskTimerRunning(task);
@@ -2312,25 +2345,58 @@ export function renderKanban(
 						timeDisplay.addClass("empty");
 					}
 					
-					// Update button states and row visual state
-					if (isRunning) {
-						startButton.disabled = true;
-						stopButton.disabled = false;
-						startButton.addClass("disabled");
-						stopButton.removeClass("disabled");
-						timeSpentCell.addClass("running");
-						actionsCell.addClass("running");
-						row.addClass("timer-running");
-					} else {
-						startButton.disabled = false;
-						stopButton.disabled = true;
-						startButton.removeClass("disabled");
-						stopButton.addClass("disabled");
-						timeSpentCell.removeClass("running");
-						actionsCell.removeClass("running");
-						row.removeClass("timer-running");
+					// Update button states and row visual state (only if buttons exist)
+					if (startButton && stopButton && actionsCell) {
+						if (isRunning) {
+							startButton.disabled = true;
+							stopButton.disabled = false;
+							startButton.addClass("disabled");
+							stopButton.removeClass("disabled");
+							timeSpentCell.addClass("running");
+							actionsCell.addClass("running");
+							row.addClass("timer-running");
+						} else {
+							startButton.disabled = false;
+							stopButton.disabled = true;
+							startButton.removeClass("disabled");
+							stopButton.addClass("disabled");
+							timeSpentCell.removeClass("running");
+							actionsCell.removeClass("running");
+							row.removeClass("timer-running");
+						}
 					}
 				}
+				
+				// Make time spent cell editable on double-click (for target time)
+				timeSpentCell.style.cursor = "pointer";
+				timeSpentCell.addEventListener("dblclick", (e) => {
+					e.stopPropagation();
+					const modal = new EditTargetTimeModal(
+						plugin.app,
+						task.targetTime,
+						async (newTargetTime) => {
+							if (newTargetTime === null) return; // User cancelled
+							
+							if (newTargetTime === "") {
+								task.targetTime = undefined;
+							} else {
+								task.targetTime = newTargetTime;
+							}
+							
+							updateTimerDisplay();
+							// Update progress bar if it exists
+							const updateProgressBar = (row as any).updateProgressBar;
+							if (updateProgressBar) {
+								updateProgressBar();
+							}
+							
+							renderTableView();
+							setTimeout(() => applyFilter(), 0);
+							await saveTasksToFile(task.task);
+						}
+					);
+					modal.open();
+				});
 			
 			// Progress bar cell
 			const progressCell = row.createEl("td", { cls: "kanban-table-cell-progress" });
@@ -2410,21 +2476,21 @@ export function renderKanban(
 				(row as any).updateProgressBar = updateProgressBar;
 			
 			// Actions cell with timer buttons
-			const actionsCell = row.createEl("td", { cls: "kanban-table-cell-actions" });
+			actionsCell = row.createEl("td", { cls: "kanban-table-cell-actions" });
 			if (data.columnWidths?.actions) {
 				actionsCell.style.width = data.columnWidths.actions + "px";
 			}
 			const timerButtons = actionsCell.createDiv("kanban-table-timer-buttons");
 				
 				// Start button
-				const startButton = timerButtons.createEl("button", {
+				startButton = timerButtons.createEl("button", {
 					cls: "kanban-table-timer-button kanban-table-timer-start",
 					attr: { "aria-label": "Start timer" }
 				});
 				startButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
 				
 				// Stop button
-				const stopButton = timerButtons.createEl("button", {
+				stopButton = timerButtons.createEl("button", {
 					cls: "kanban-table-timer-button kanban-table-timer-stop",
 					attr: { "aria-label": "Stop timer" }
 				});

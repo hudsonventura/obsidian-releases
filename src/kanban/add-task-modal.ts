@@ -1,10 +1,12 @@
-import { Modal, App, Setting } from "obsidian";
+import { Modal, App, Setting, moment } from "obsidian";
 import { KanbanTask } from "../types";
+import { DueDateModal } from "./due-date-modal";
 
 export class AddTaskModal extends Modal {
 	private callback: (task: KanbanTask | null) => void;
 	private taskName: string = "";
 	private targetTime: string = "";
+	private dueDate: string | undefined = undefined;
 
 	constructor(app: App, callback: (task: KanbanTask | null) => void) {
 		super(app);
@@ -63,6 +65,50 @@ export class AddTaskModal extends Modal {
 				text.inputEl.addEventListener("keydown", (e) => {
 					if (e.key === "Enter") {
 						e.preventDefault();
+						// Move to due date button or submit
+						if (dueDateButton) {
+							dueDateButton.focus();
+						} else {
+							this.submit();
+						}
+					}
+				});
+			});
+
+		// Due date setting
+		let dueDateButton: HTMLButtonElement | null = null;
+		const dueDateSetting = new Setting(contentEl)
+			.setName("Due date")
+			.setDesc("Optional. Set a due date and time for this task")
+			.addButton((btn) => {
+				dueDateButton = btn.buttonEl;
+				const updateDueDateButton = () => {
+					if (this.dueDate) {
+						const date = moment(this.dueDate);
+						btn.setButtonText(date.format("MMM D, YYYY HH:mm"));
+						btn.buttonEl.classList.add("has-due-date");
+					} else {
+						btn.setButtonText("Set due date");
+						btn.buttonEl.classList.remove("has-due-date");
+					}
+				};
+				updateDueDateButton();
+				
+				btn.onClick(() => {
+					const modal = new DueDateModal(this.app, this.dueDate, (date) => {
+						if (date === null) {
+							this.dueDate = undefined;
+						} else {
+							this.dueDate = date;
+						}
+						updateDueDateButton();
+					});
+					modal.open();
+				});
+				
+				btn.buttonEl.addEventListener("keydown", (e) => {
+					if (e.key === "Enter") {
+						e.preventDefault();
 						this.submit();
 					}
 				});
@@ -111,6 +157,11 @@ export class AddTaskModal extends Modal {
 		const trimmedTargetTime = this.targetTime.trim();
 		if (trimmedTargetTime) {
 			newTask.targetTime = trimmedTargetTime;
+		}
+
+		// Add due date if provided
+		if (this.dueDate) {
+			newTask.dueDate = this.dueDate;
 		}
 
 		this.close();
