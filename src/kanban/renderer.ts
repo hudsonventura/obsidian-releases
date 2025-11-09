@@ -612,7 +612,8 @@ export function renderKanban(
 			const modal = new DueDateModal(
 				plugin.app,
 				task.dueDate,
-				async (newDate) => {
+				task.targetTime,
+				async (newDate, newTargetTime) => {
 					if (newDate === null) {
 						// Clear due date
 						task.dueDate = undefined;
@@ -621,12 +622,28 @@ export function renderKanban(
 						task.dueDate = newDate;
 					}
 					
-					// Update display
+					// Update target time
+					if (newTargetTime === null) {
+						// User cancelled, don't change target time
+					} else if (newTargetTime === "") {
+						// Clear target time
+						task.targetTime = undefined;
+					} else {
+						// Set new target time
+						task.targetTime = newTargetTime;
+					}
+					
+					// Update displays
 					updateDueDateDisplay();
+					updateTimerDisplay();
+					const updateProgressBar = (taskEl as any).updateProgressBar;
+					if (updateProgressBar) {
+						updateProgressBar();
+					}
 					
 					// Save to file
 					await saveTasksToFile(task.task);
-					console.log("Kanban: Due date updated:", task.dueDate);
+					console.log("Kanban: Due date updated:", task.dueDate, "Target time:", task.targetTime);
 				}
 			);
 			modal.open();
@@ -2351,13 +2368,31 @@ export function renderKanban(
 			const modal = new DueDateModal(
 				plugin.app,
 				task.dueDate,
-				async (newDate) => {
+				task.targetTime,
+				async (newDate, newTargetTime) => {
 					if (newDate === null) {
 						task.dueDate = undefined;
 					} else {
 						task.dueDate = newDate;
 					}
+					
+					// Update target time
+					if (newTargetTime === null) {
+						// User cancelled, don't change target time
+					} else if (newTargetTime === "") {
+						// Clear target time
+						task.targetTime = undefined;
+					} else {
+						// Set new target time
+						task.targetTime = newTargetTime;
+					}
+					
 					updateDueDateDisplay();
+					updateTimerDisplay();
+					const updateProgressBar = (row as any).updateProgressBar;
+					if (updateProgressBar) {
+						updateProgressBar();
+					}
 					renderTableView();
 					setTimeout(() => applyFilter(), 0);
 					await saveTasksToFile(task.task);
@@ -2618,19 +2653,32 @@ export function renderKanban(
 					});
 					
 					menu.addItem((item) => {
-						item.setTitle("Edit Due Date").setIcon("calendar").onClick(() => {
+						item.setTitle("Edit Due Date & Target Time").setIcon("calendar").onClick(() => {
 							const modal = new DueDateModal(
 								plugin.app,
 								task.dueDate,
-								async (newDate) => {
+								task.targetTime,
+								async (newDate, newTargetTime) => {
 									if (newDate === null) {
 										task.dueDate = undefined;
 									} else {
-									task.dueDate = newDate;
-								}
-								renderTableView();
-								setTimeout(() => applyFilter(), 0);
-								await saveTasksToFile(task.task);
+										task.dueDate = newDate;
+									}
+									
+									// Update target time
+									if (newTargetTime === null) {
+										// User cancelled, don't change target time
+									} else if (newTargetTime === "") {
+										// Clear target time
+										task.targetTime = undefined;
+									} else {
+										// Set new target time
+										task.targetTime = newTargetTime;
+									}
+									
+									renderTableView();
+									setTimeout(() => applyFilter(), 0);
+									await saveTasksToFile(task.task);
 								}
 							);
 							modal.open();
@@ -2810,42 +2858,58 @@ export function renderKanban(
 				}
 				
 				// Handle reordering within same status or moving to different status
-				if (sourceStatus === status && draggedOverRow) {
+				if (sourceStatus === status) {
 					// Reordering within same status - don't change status or updateDateTime
-					const targetTaskName = draggedOverRow.getAttribute("data-task");
-					
-					// Don't do anything if dropping on itself
-					if (targetTaskName === taskText) {
-					console.log("Kanban: Dropped task on itself, ignoring");
-					draggedOverRow = null;
-					renderTableView();
-					setTimeout(() => applyFilter(), 0);
-					return;
+					if (draggedOverRow) {
+						const targetTaskName = draggedOverRow.getAttribute("data-task");
+						
+						// Don't do anything if dropping on itself
+						if (targetTaskName === taskText) {
+							console.log("Kanban: Dropped task on itself, ignoring");
+							draggedOverRow = null;
+							renderTableView();
+							setTimeout(() => applyFilter(), 0);
+							return;
+						}
+						
+						const statusTasks = tasksByStatus.get(status) || [];
+						
+						// Find original indices
+						const sourceIndex = statusTasks.findIndex(t => t.task === taskText);
+						const targetIndexOriginal = statusTasks.findIndex(t => t.task === targetTaskName);
+						
+						if (sourceIndex < 0 || targetIndexOriginal < 0) {
+							console.warn("Kanban: Could not find source or target task in array");
+							return;
+						}
+						
+						// Remove the moved task from its current position
+						const [movedTaskObj] = statusTasks.splice(sourceIndex, 1);
+						
+						// Recalculate target index after removal
+						const newTargetIndex = statusTasks.findIndex(t => t.task === targetTaskName);
+						
+						// Insert at the correct position
+						const insertIndex = insertBefore ? newTargetIndex : newTargetIndex + 1;
+						statusTasks.splice(insertIndex, 0, movedTaskObj);
+						tasksByStatus.set(status, statusTasks);
+						
+						console.log("Kanban: Reordered task", taskText, "within", status, "from index", sourceIndex, "to", insertIndex);
+					} else {
+						// Dropping in empty area of same status - move to end
+						const statusTasks = tasksByStatus.get(status) || [];
+						const sourceIndex = statusTasks.findIndex(t => t.task === taskText);
+						
+						if (sourceIndex >= 0) {
+							// Remove from current position
+							const [movedTaskObj] = statusTasks.splice(sourceIndex, 1);
+							// Add to end
+							statusTasks.push(movedTaskObj);
+							tasksByStatus.set(status, statusTasks);
+							
+							console.log("Kanban: Moved task", taskText, "to end of", status);
+						}
 					}
-					
-					const statusTasks = tasksByStatus.get(status) || [];
-					
-					// Find original indices
-					const sourceIndex = statusTasks.findIndex(t => t.task === taskText);
-					const targetIndexOriginal = statusTasks.findIndex(t => t.task === targetTaskName);
-					
-					if (sourceIndex < 0 || targetIndexOriginal < 0) {
-						console.warn("Kanban: Could not find source or target task in array");
-						return;
-					}
-					
-					// Remove the moved task from its current position
-					const [movedTaskObj] = statusTasks.splice(sourceIndex, 1);
-					
-					// Recalculate target index after removal
-					const newTargetIndex = statusTasks.findIndex(t => t.task === targetTaskName);
-					
-					// Insert at the correct position
-					const insertIndex = insertBefore ? newTargetIndex : newTargetIndex + 1;
-					statusTasks.splice(insertIndex, 0, movedTaskObj);
-					tasksByStatus.set(status, statusTasks);
-					
-					console.log("Kanban: Reordered task", taskText, "within", status, "from index", sourceIndex, "to", insertIndex);
 				} else if (sourceStatus !== status) {
 					// Moving to different status
 					const oldStatusTasks = tasksByStatus.get(sourceStatus) || [];

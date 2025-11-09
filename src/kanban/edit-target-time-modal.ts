@@ -86,13 +86,19 @@ export class EditTargetTimeModal extends Modal {
 
 	private submit(): void {
 		// Trim the input
-		const trimmedInput = this.targetTimeInput.trim();
+		let trimmedInput = this.targetTimeInput.trim();
 		
 		// If empty, return empty string to clear target time
 		if (trimmedInput.length === 0) {
 			this.close();
 			this.callback("");
 			return;
+		}
+
+		// If input is just a number, treat it as hours
+		const numberOnlyPattern = /^\d+(\.\d+)?$/;
+		if (numberOnlyPattern.test(trimmedInput)) {
+			trimmedInput = trimmedInput + "h";
 		}
 
 		// Basic validation - check if it matches common time patterns

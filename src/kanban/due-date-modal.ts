@@ -1,18 +1,21 @@
-import { App, Modal, moment } from "obsidian";
+import { App, Modal, moment, Setting } from "obsidian";
 
 export class DueDateModal extends Modal {
 	private selectedDate: moment.Moment;
 	private selectedHour: number = 9;
 	private selectedMinute: number = 0;
-	private onSubmit: (date: string | null) => void;
+	private targetTimeInput: string;
+	private onSubmit: (date: string | null, targetTime: string | null) => void;
 	
 	constructor(
 		app: App,
 		currentDate: string | undefined,
-		onSubmit: (date: string | null) => void
+		currentTargetTime: string | undefined,
+		onSubmit: (date: string | null, targetTime: string | null) => void
 	) {
 		super(app);
 		this.onSubmit = onSubmit;
+		this.targetTimeInput = currentTargetTime || "";
 		
 		// Initialize with current date or today
 		if (currentDate) {
@@ -27,47 +30,60 @@ export class DueDateModal extends Modal {
 	}
 	
 	onOpen() {
-		const { contentEl } = this;
+		const { contentEl, modalEl } = this;
 		contentEl.empty();
 		contentEl.addClass("due-date-modal");
 		
+		// Make modal smaller
+		modalEl.style.width = "400px";
+		modalEl.style.maxWidth = "90vw";
+		
 		// Modal title
-		contentEl.createEl("h2", { text: "Set Due Date" });
+		contentEl.createEl("h2", { text: "Set Due Date & Target Time", attr: { style: "font-size: 1.1rem; margin-bottom: 0.75rem;" } });
 		
-		// Calendar container
+		// Calendar container - make it more compact
 		const calendarContainer = contentEl.createDiv("due-date-calendar-container");
+		calendarContainer.style.padding = "0.5rem";
 		
-		// Month/Year navigation
+		// Month/Year navigation - make it more compact
 		const navContainer = calendarContainer.createDiv("calendar-nav");
+		navContainer.style.marginBottom = "0.5rem";
+		navContainer.style.gap = "0.5rem";
 		
 		const prevButton = navContainer.createEl("button", {
 			cls: "calendar-nav-button",
-			text: "←"
+			text: "←",
+			attr: { style: "padding: 0.3rem 0.6rem; font-size: 1rem;" }
 		});
 		
 		const monthYearDisplay = navContainer.createEl("div", {
 			cls: "calendar-month-year",
-			text: this.selectedDate.format("MMMM YYYY")
+			text: this.selectedDate.format("MMMM YYYY"),
+			attr: { style: "font-size: 0.95rem;" }
 		});
 		
 		const nextButton = navContainer.createEl("button", {
 			cls: "calendar-nav-button",
-			text: "→"
+			text: "→",
+			attr: { style: "padding: 0.3rem 0.6rem; font-size: 1rem;" }
 		});
 		
-		// Calendar grid
+		// Calendar grid - make it more compact
 		const calendarGrid = calendarContainer.createDiv("calendar-grid");
+		calendarGrid.style.gap = "0.15rem";
 		
 		// Function to render calendar
 		const renderCalendar = () => {
 			calendarGrid.empty();
 			monthYearDisplay.setText(this.selectedDate.format("MMMM YYYY"));
 			
-			// Day headers
+			// Day headers - make them smaller
 			const dayHeaders = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 			dayHeaders.forEach(day => {
 				const dayHeader = calendarGrid.createDiv("calendar-day-header");
 				dayHeader.setText(day);
+				dayHeader.style.fontSize = "0.65rem";
+				dayHeader.style.padding = "0.3rem";
 			});
 			
 			// Get calendar data
@@ -83,6 +99,8 @@ export class DueDateModal extends Modal {
 			let currentDate = startDate.clone();
 			while (currentDate.isSameOrBefore(endDate, 'day')) {
 				const dayEl = calendarGrid.createDiv("calendar-day");
+				dayEl.style.fontSize = "0.75rem";
+				dayEl.style.padding = "0.4rem";
 				const dayDate = currentDate.clone();
 				
 				dayEl.setText(currentDate.format("D"));
@@ -120,9 +138,11 @@ export class DueDateModal extends Modal {
 			renderCalendar();
 		});
 		
-		// Time picker
+		// Time picker - make it more compact
 		const timeContainer = contentEl.createDiv("due-date-time-container");
-		timeContainer.createEl("label", { text: "Time:", cls: "due-date-time-label" });
+		timeContainer.style.padding = "0.5rem";
+		timeContainer.style.marginBottom = "0.75rem";
+		timeContainer.createEl("label", { text: "Time:", cls: "due-date-time-label", attr: { style: "font-size: 0.85rem;" } });
 		
 		const timeInputContainer = timeContainer.createDiv("due-date-time-inputs");
 		
@@ -132,11 +152,12 @@ export class DueDateModal extends Modal {
 			attr: {
 				min: "0",
 				max: "23",
-				value: this.selectedHour.toString()
+				value: this.selectedHour.toString(),
+				style: "width: 50px; padding: 0.3rem; font-size: 0.85rem;"
 			}
 		});
 		
-		timeInputContainer.createSpan({ text: ":", cls: "due-date-time-separator" });
+		timeInputContainer.createSpan({ text: ":", cls: "due-date-time-separator", attr: { style: "font-size: 1rem;" } });
 		
 		const minuteInput = timeInputContainer.createEl("input", {
 			type: "number",
@@ -144,21 +165,25 @@ export class DueDateModal extends Modal {
 			attr: {
 				min: "0",
 				max: "59",
-				value: this.selectedMinute.toString().padStart(2, '0')
+				value: this.selectedMinute.toString().padStart(2, '0'),
+				style: "width: 50px; padding: 0.3rem; font-size: 0.85rem;"
 			}
 		});
 		
-		// Preview
+		// Preview - make it more compact
 		const previewContainer = contentEl.createDiv("due-date-preview");
+		previewContainer.style.padding = "0.5rem";
+		previewContainer.style.marginBottom = "0.75rem";
 		const previewText = previewContainer.createEl("div", {
-			cls: "due-date-preview-text"
+			cls: "due-date-preview-text",
+			attr: { style: "font-size: 0.85rem;" }
 		});
 		
 		const updatePreview = () => {
 			const previewDate = this.selectedDate.clone()
 				.hour(this.selectedHour)
 				.minute(this.selectedMinute);
-			previewText.setText(`Selected: ${previewDate.format("MMM D, YYYY HH:mm")}`);
+			previewText.setText(`Due: ${previewDate.format("MMM D, YYYY HH:mm")}`);
 		};
 		
 		// Time input handlers
@@ -180,19 +205,22 @@ export class DueDateModal extends Modal {
 			updatePreview();
 		});
 		
-		// Quick time buttons
+		// Quick time buttons - make them smaller
 		const quickTimeContainer = contentEl.createDiv("due-date-quick-time");
+		quickTimeContainer.style.gap = "0.4rem";
+		quickTimeContainer.style.marginBottom = "0.75rem";
 		const quickTimes = [
-			{ label: "Morning (9:00)", hour: 9, minute: 0 },
-			{ label: "Afternoon (14:00)", hour: 14, minute: 0 },
-			{ label: "Evening (18:00)", hour: 18, minute: 0 },
-			{ label: "End of Day (23:59)", hour: 23, minute: 59 }
+			{ label: "9:00", hour: 9, minute: 0 },
+			{ label: "14:00", hour: 14, minute: 0 },
+			{ label: "18:00", hour: 18, minute: 0 },
+			{ label: "23:59", hour: 23, minute: 59 }
 		];
 		
 		quickTimes.forEach(({ label, hour, minute }) => {
 			const btn = quickTimeContainer.createEl("button", {
 				text: label,
-				cls: "due-date-quick-time-btn"
+				cls: "due-date-quick-time-btn",
+				attr: { style: "padding: 0.3rem 0.6rem; font-size: 0.8rem;" }
 			});
 			btn.addEventListener("click", () => {
 				this.selectedHour = hour;
@@ -202,6 +230,19 @@ export class DueDateModal extends Modal {
 				updatePreview();
 			});
 		});
+		
+		// Target time input
+		new Setting(contentEl)
+			.setName("Target Time")
+			.setDesc("Format: Xh Ym (e.g., 2h 30m, 1.5h, 45m)")
+			.addText((text) => {
+				text
+					.setPlaceholder("2h 30m")
+					.setValue(this.targetTimeInput)
+					.onChange((value) => {
+						this.targetTimeInput = value;
+					});
+			});
 		
 		// Buttons
 		const buttonContainer = contentEl.createDiv("due-date-modal-buttons");
@@ -217,12 +258,12 @@ export class DueDateModal extends Modal {
 		});
 		
 		const submitButton = buttonContainer.createEl("button", {
-			text: "Set Due Date",
+			text: "Save",
 			cls: "due-date-modal-button due-date-modal-submit"
 		});
 		
 		clearButton.addEventListener("click", () => {
-			this.onSubmit(null);
+			this.onSubmit(null, null);
 			this.close();
 		});
 		
@@ -235,7 +276,39 @@ export class DueDateModal extends Modal {
 				.hour(this.selectedHour)
 				.minute(this.selectedMinute)
 				.toISOString();
-			this.onSubmit(finalDate);
+			
+			// Validate and format target time
+			let targetTime: string | null = null;
+			let trimmedTargetTime = this.targetTimeInput.trim();
+			if (trimmedTargetTime.length > 0) {
+				// If input is just a number, treat it as hours
+				const numberOnlyPattern = /^\d+(\.\d+)?$/;
+				if (numberOnlyPattern.test(trimmedTargetTime)) {
+					trimmedTargetTime = trimmedTargetTime + "h";
+				}
+				
+				// Basic validation
+				const timePattern = /^(\d+(\.\d+)?\s*[hH])?(\s*\d+\s*[mM])?$/;
+				if (timePattern.test(trimmedTargetTime)) {
+					targetTime = trimmedTargetTime;
+				} else {
+					// Show error but don't close
+					const errorEl = contentEl.querySelector(".target-time-error");
+					if (errorEl) {
+						errorEl.remove();
+					}
+					const newError = contentEl.createDiv("target-time-error");
+					newError.style.color = "var(--text-error)";
+					newError.style.marginTop = "0.5rem";
+					newError.style.fontSize = "0.8rem";
+					newError.setText("Invalid target time format. Use: 2h, 30m, or 1h 30m");
+					return;
+				}
+			} else {
+				targetTime = "";
+			}
+			
+			this.onSubmit(finalDate, targetTime);
 			this.close();
 		});
 		

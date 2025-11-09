@@ -95,12 +95,21 @@ export class AddTaskModal extends Modal {
 				updateDueDateButton();
 				
 				btn.onClick(() => {
-					const modal = new DueDateModal(this.app, this.dueDate, (date) => {
+					const modal = new DueDateModal(this.app, this.dueDate, this.targetTime, (date, targetTime) => {
 						if (date === null) {
 							this.dueDate = undefined;
 						} else {
 							this.dueDate = date;
 						}
+						
+						// Update target time if provided
+						if (targetTime !== null && targetTime !== "") {
+							this.targetTime = targetTime;
+							if (targetTimeInput) {
+								targetTimeInput.setValue(targetTime);
+							}
+						}
+						
 						updateDueDateButton();
 					});
 					modal.open();
@@ -154,8 +163,13 @@ export class AddTaskModal extends Modal {
 		};
 
 		// Add target time if provided
-		const trimmedTargetTime = this.targetTime.trim();
+		let trimmedTargetTime = this.targetTime.trim();
 		if (trimmedTargetTime) {
+			// If input is just a number, treat it as hours
+			const numberOnlyPattern = /^\d+(\.\d+)?$/;
+			if (numberOnlyPattern.test(trimmedTargetTime)) {
+				trimmedTargetTime = trimmedTargetTime + "h";
+			}
 			newTask.targetTime = trimmedTargetTime;
 		}
 
