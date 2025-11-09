@@ -96,52 +96,6 @@ class KanbanSettingTab extends PluginSettingTab {
 
 		containerEl.createEl('h2', { text: 'Kanban Plugin Settings' });
 		
-		// Inspiring message
-		const messageContainer = containerEl.createDiv({ cls: 'kanban-settings-message' });
-		messageContainer.createEl('p', { 
-			text: '✨ Thank you for using Kanban Plugin! ✨',
-			attr: { style: 'font-size: 1.1rem; font-weight: 600; color: var(--interactive-accent); margin-bottom: 0.5rem;' }
-		});
-		messageContainer.createEl('p', { 
-			text: 'Stay focused, track your progress, and achieve your goals one task at a time. Remember: small consistent steps lead to great achievements!',
-			attr: { style: 'font-style: italic; opacity: 0.9; margin-bottom: 1rem; line-height: 1.5;' }
-		});
-		
-		// Buy Me a Coffee button
-		const coffeeContainer = containerEl.createDiv({ 
-			cls: 'kanban-settings-coffee',
-			attr: { style: 'margin: 1.5rem 0; text-align: center;' }
-		});
-		
-		const coffeeButton = coffeeContainer.createEl('a', {
-			text: '☕ Buy me a coffee',
-			href: 'https://www.buymeacoffee.com/hudsonventura',
-			attr: { 
-				style: 'display: inline-block; background-color: #FFDD00; color: #000000; padding: 0.7rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; font-family: Poppins, sans-serif; border: 2px solid #000000; transition: all 0.2s ease; cursor: pointer;',
-				target: '_blank',
-				rel: 'noopener noreferrer'
-			}
-		});
-		
-		// Add hover effect via event listeners
-		coffeeButton.addEventListener('mouseenter', () => {
-			coffeeButton.style.transform = 'scale(1.05)';
-			coffeeButton.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
-		});
-		coffeeButton.addEventListener('mouseleave', () => {
-			coffeeButton.style.transform = 'scale(1)';
-			coffeeButton.style.boxShadow = 'none';
-		});
-		
-		coffeeContainer.createEl('p', {
-			text: 'If this plugin helps you stay organized and productive, consider supporting its development!',
-			attr: { style: 'margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.7;' }
-		});
-		
-		containerEl.createEl('hr', { 
-			attr: { style: 'margin: 2rem 0; border: none; border-top: 1px solid var(--background-modifier-border);' }
-		});
-		
 		containerEl.createEl('h3', { text: 'Progress Bar Color Thresholds' });
 		
 		containerEl.createEl('p', { 
@@ -209,6 +163,106 @@ class KanbanSettingTab extends PluginSettingTab {
 			text: 'Example: With default settings (69, 84, 99, 100), a task with 50% progress is green, 75% is yellow, 90% is orange, and 100%+ is red.',
 			cls: 'setting-item-description',
 			attr: { style: 'margin-top: 1rem; font-style: italic; opacity: 0.8;' }
+		});
+		
+		containerEl.createEl('hr', { 
+			attr: { style: 'margin: 2rem 0; border: none; border-top: 1px solid var(--background-modifier-border);' }
+		});
+		
+		// Inspiring message
+		const messageContainer = containerEl.createDiv({ cls: 'kanban-settings-message' });
+		messageContainer.createEl('p', { 
+			text: '✨ Thank you for using Kanban Plugin! ✨',
+			attr: { style: 'font-size: 1.1rem; font-weight: 600; color: var(--interactive-accent); margin-bottom: 0.5rem;' }
+		});
+		messageContainer.createEl('p', { 
+			text: 'Stay focused, track your progress, and achieve your goals one task at a time. Remember: small consistent steps lead to great achievements!',
+			attr: { style: 'font-style: italic; opacity: 0.9; margin-bottom: 1rem; line-height: 1.5;' }
+		});
+		
+		// Buy Me a Coffee button
+		const coffeeContainer = containerEl.createDiv({ 
+			cls: 'kanban-settings-coffee',
+			attr: { style: 'margin: 1.5rem 0; text-align: center;' }
+		});
+		
+		const coffeeButton = coffeeContainer.createEl('a', {
+			text: '☕ Buy me a coffee',
+			href: 'https://www.buymeacoffee.com/hudsonventura',
+			attr: { 
+				style: 'display: inline-block; background-color: #FFDD00; color: #000000; padding: 0.7rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; font-family: Poppins, sans-serif; border: 2px solid #000000; transition: all 0.2s ease; cursor: pointer;',
+				target: '_blank',
+				rel: 'noopener noreferrer'
+			}
+		});
+		
+		// Add hover effect via event listeners
+		coffeeButton.addEventListener('mouseenter', () => {
+			coffeeButton.style.transform = 'scale(1.05)';
+			coffeeButton.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+		});
+		coffeeButton.addEventListener('mouseleave', () => {
+			coffeeButton.style.transform = 'scale(1)';
+			coffeeButton.style.boxShadow = 'none';
+		});
+		
+		coffeeContainer.createEl('p', {
+			text: 'If this plugin helps you stay organized and productive, consider supporting its development!',
+			attr: { style: 'margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.7;' }
+		});
+		
+		// Links to website and GitHub
+		const linksContainer = containerEl.createDiv({ 
+			attr: { style: 'margin: 1.5rem 0; text-align: center;' }
+		});
+		
+		const linksText = linksContainer.createEl('p', {
+			text: 'Connect with me:',
+			attr: { style: 'margin-bottom: 0.75rem; font-size: 0.9rem; opacity: 0.8;' }
+		});
+		
+		const linksWrapper = linksContainer.createDiv({ 
+			attr: { style: 'display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;' }
+		});
+		
+		// GitHub link
+		const githubLink = linksWrapper.createEl('a', {
+			text: '🔗 GitHub',
+			href: 'https://github.com/hudsonventura',
+			attr: { 
+				style: 'display: inline-block; color: var(--text-normal); padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-weight: 500; border: 1px solid var(--background-modifier-border); transition: all 0.2s ease;',
+				target: '_blank',
+				rel: 'noopener noreferrer'
+			}
+		});
+		
+		githubLink.addEventListener('mouseenter', () => {
+			githubLink.style.backgroundColor = 'var(--background-modifier-hover)';
+			githubLink.style.borderColor = 'var(--interactive-accent)';
+		});
+		githubLink.addEventListener('mouseleave', () => {
+			githubLink.style.backgroundColor = 'transparent';
+			githubLink.style.borderColor = 'var(--background-modifier-border)';
+		});
+		
+		// Website link
+		const websiteLink = linksWrapper.createEl('a', {
+			text: '🌐 Website',
+			href: 'https://hudsonventura.ddnsfree.com',
+			attr: { 
+				style: 'display: inline-block; color: var(--text-normal); padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-weight: 500; border: 1px solid var(--background-modifier-border); transition: all 0.2s ease;',
+				target: '_blank',
+				rel: 'noopener noreferrer'
+			}
+		});
+		
+		websiteLink.addEventListener('mouseenter', () => {
+			websiteLink.style.backgroundColor = 'var(--background-modifier-hover)';
+			websiteLink.style.borderColor = 'var(--interactive-accent)';
+		});
+		websiteLink.addEventListener('mouseleave', () => {
+			websiteLink.style.backgroundColor = 'transparent';
+			websiteLink.style.borderColor = 'var(--background-modifier-border)';
 		});
 	}
 }
