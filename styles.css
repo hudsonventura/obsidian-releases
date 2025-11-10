@@ -161,11 +161,11 @@
 	width: 100%;
 	background-color: var(--background-secondary);
 	border-radius: 8px;
-	padding: 1rem;
+	padding: 0.5rem;
 	display: flex;
 	flex-direction: row;
 	transition: all 0.3s ease;
-	gap: 1rem;
+	gap: 0.75rem;
 }
 
 .kanban-board-horizontal .kanban-column-header {
@@ -179,7 +179,7 @@
 
 .kanban-board-horizontal .kanban-column-header h3 {
 	margin: 0;
-	padding: 0.5rem;
+	padding: 0.35rem;
 	font-size: 1rem;
 	font-weight: 600;
 	color: var(--text-normal);
@@ -193,7 +193,7 @@
 	display: flex;
 	flex-direction: row;
 	flex-wrap: wrap;
-	gap: 0.75rem;
+	gap: 0.5rem;
 	flex: 1;
 	min-height: 100px;
 	transition: background-color 0.2s ease;
@@ -242,7 +242,7 @@
 	max-width: 350px;
 	background-color: var(--background-secondary);
 	border-radius: 8px;
-	padding: 1rem;
+	padding: 0.5rem;
 	display: flex;
 	flex-direction: column;
 	transition: all 0.3s ease;
@@ -250,7 +250,7 @@
 }
 
 .kanban-board-vertical .kanban-column-header {
-	margin-bottom: 1rem;
+	margin-bottom: 0.5rem;
 	display: flex;
 	flex-direction: row;
 	align-items: center;
@@ -260,7 +260,7 @@
 
 .kanban-board-vertical .kanban-column-header h3 {
 	margin: 0;
-	padding: 0.5rem;
+	padding: 0.35rem;
 	font-size: 1rem;
 	font-weight: 600;
 	color: var(--text-normal);
@@ -275,7 +275,7 @@
 .kanban-board-vertical .kanban-column-tasks {
 	display: flex;
 	flex-direction: column;
-	gap: 0.75rem;
+	gap: 0.5rem;
 	flex: 1;
 	min-height: 50px;
 	transition: background-color 0.2s ease;
@@ -400,7 +400,7 @@
 	background-color: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 6px;
-	padding: 0.6rem;
+	padding: 0.5rem;
 	cursor: pointer;
 	transition: all 0.2s ease;
 	min-width: 250px;
@@ -1046,19 +1046,19 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 /* Due Date Modal Styles */
 
 .due-date-modal {
-	padding: 1rem;
+	padding: 0.75rem;
 }
 
 .due-date-modal h2 {
-	margin: 0 0 1rem 0;
+	margin: 0 0 0.75rem 0;
 	text-align: center;
 }
 
 .due-date-calendar-container {
-	margin-bottom: 1rem;
-	padding: 1rem;
+	margin-bottom: 0.75rem;
+	padding: 0.5rem;
 	background-color: var(--background-secondary);
-	border-radius: 8px;
+	border-radius: 6px;
 	border: 1px solid var(--background-modifier-border);
 }
 
@@ -1066,17 +1066,17 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	margin-bottom: 1rem;
-	gap: 1rem;
+	margin-bottom: 0.5rem;
+	gap: 0.5rem;
 }
 
 .calendar-nav-button {
 	background-color: var(--background-modifier-border);
 	border: none;
 	border-radius: 4px;
-	padding: 0.5rem 1rem;
+	padding: 0.3rem 0.6rem;
 	cursor: pointer;
-	font-size: 1.2rem;
+	font-size: 1rem;
 	font-weight: bold;
 	color: var(--text-normal);
 	transition: background-color 0.2s ease;
@@ -1087,7 +1087,7 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .calendar-month-year {
-	font-size: 1.1rem;
+	font-size: 0.95rem;
 	font-weight: 600;
 	color: var(--text-normal);
 	text-align: center;
@@ -1097,15 +1097,15 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 .calendar-grid {
 	display: grid;
 	grid-template-columns: repeat(7, 1fr);
-	gap: 0.25rem;
+	gap: 0.15rem;
 }
 
 .calendar-day-header {
 	text-align: center;
-	font-size: 0.75rem;
+	font-size: 0.65rem;
 	font-weight: 600;
 	color: var(--text-muted);
-	padding: 0.5rem;
+	padding: 0.3rem;
 }
 
 .calendar-day {
@@ -1115,11 +1115,12 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	justify-content: center;
 	border-radius: 4px;
 	cursor: pointer;
-	font-size: 0.9rem;
+	font-size: 0.75rem;
 	transition: all 0.2s ease;
 	background-color: var(--background-primary);
 	color: var(--text-normal);
 	border: 1px solid transparent;
+	padding: 0.4rem;
 }
 
 .calendar-day:hover {
@@ -1148,19 +1149,19 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .due-date-time-container {
-	margin-bottom: 1rem;
-	padding: 1rem;
+	margin-bottom: 0.75rem;
+	padding: 0.5rem;
 	background-color: var(--background-secondary);
-	border-radius: 8px;
+	border-radius: 6px;
 	border: 1px solid var(--background-modifier-border);
 	display: flex;
 	flex-direction: column;
-	gap: 0.75rem;
+	gap: 0.5rem;
 }
 
 .due-date-time-label {
 	font-weight: 600;
-	font-size: 0.9rem;
+	font-size: 0.85rem;
 	color: var(--text-normal);
 }
 
@@ -1171,13 +1172,13 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .due-date-time-input {
-	width: 60px;
-	padding: 0.5rem;
+	width: 50px;
+	padding: 0.3rem;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 4px;
 	background-color: var(--background-primary);
 	color: var(--text-normal);
-	font-size: 1rem;
+	font-size: 0.85rem;
 	text-align: center;
 }
 
@@ -1199,12 +1200,12 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .due-date-quick-time-btn {
-	padding: 0.4rem 0.8rem;
+	padding: 0.3rem 0.6rem;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 4px;
 	background-color: var(--background-primary);
 	color: var(--text-normal);
-	font-size: 0.85rem;
+	font-size: 0.8rem;
 	cursor: pointer;
 	transition: all 0.2s ease;
 }
@@ -1215,8 +1216,8 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .due-date-preview {
-	margin-bottom: 1rem;
-	padding: 0.75rem;
+	margin-bottom: 0.75rem;
+	padding: 0.5rem;
 	background-color: var(--background-secondary);
 	border-radius: 6px;
 	border: 1px solid var(--background-modifier-border);
@@ -1224,7 +1225,7 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .due-date-preview-text {
-	font-size: 1rem;
+	font-size: 0.85rem;
 	font-weight: 600;
 	color: var(--interactive-accent);
 }
@@ -1407,41 +1408,43 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	width: 100%;
 	display: flex;
 	flex-direction: column;
-	gap: 1.5rem;
+	gap: 0.75rem;
 }
 
 .kanban-table-section {
 	background-color: var(--background-secondary);
-	border-radius: 8px;
-	padding: 1rem;
+	border-radius: 6px;
+	padding: 0.5rem;
 	overflow: hidden;
 }
 
 .kanban-table-section.collapsed {
-	padding-bottom: 0.5rem;
+	padding-bottom: 0.25rem;
 }
 
 .kanban-table-section-header {
 	display: flex;
 	align-items: center;
-	gap: 0.75rem;
-	margin-bottom: 1rem;
-	padding-bottom: 0.75rem;
-	border-bottom: 2px solid var(--background-modifier-border);
+	gap: 0.5rem;
+	margin-bottom: 0.5rem;
+	padding-bottom: 0.4rem;
+	border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .kanban-table-collapse-btn {
 	background: none;
 	border: none;
 	cursor: pointer;
-	padding: 0.25rem;
-	border-radius: 4px;
+	padding: 0.15rem;
+	border-radius: 3px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	color: var(--text-muted);
 	transition: all 0.2s ease;
 	flex-shrink: 0;
+	width: 18px;
+	height: 18px;
 }
 
 .kanban-table-collapse-btn:hover {
@@ -1451,7 +1454,7 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 
 .kanban-table-section-title {
 	margin: 0;
-	font-size: 1.1rem;
+	font-size: 0.9rem;
 	font-weight: 600;
 	color: var(--text-normal);
 	flex: 1;
@@ -1461,22 +1464,22 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	min-width: 24px;
-	height: 24px;
-	padding: 0.25rem 0.5rem;
+	min-width: 20px;
+	height: 20px;
+	padding: 0.15rem 0.4rem;
 	background-color: var(--interactive-accent);
 	color: var(--text-on-accent);
-	border-radius: 12px;
-	font-size: 0.75rem;
+	border-radius: 10px;
+	font-size: 0.65rem;
 	font-weight: 600;
 }
 
 .kanban-table {
 	width: 100%;
 	border-collapse: collapse;
-	font-size: 0.7rem;
+	font-size: 0.65rem;
 	background-color: var(--background-primary);
-	border-radius: 6px;
+	border-radius: 4px;
 	overflow: hidden;
 }
 
@@ -1486,16 +1489,16 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 
 .kanban-table th {
 	text-align: left;
-	padding: 0.35rem 0.6rem;
+	padding: 0.25rem 0.4rem;
 	font-weight: 600;
 	color: var(--text-normal);
-	border-bottom: 2px solid var(--background-modifier-border);
+	border-bottom: 1px solid var(--background-modifier-border);
 	position: sticky;
 	top: 0;
 	background-color: var(--background-modifier-border);
 	z-index: 1;
 	line-height: 1.1;
-	font-size: 0.7rem;
+	font-size: 0.65rem;
 }
 
 .kanban-table th.sortable {
@@ -1575,11 +1578,11 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .kanban-table td {
-	padding: 0.3rem 0.6rem;
+	padding: 0.2rem 0.4rem;
 	color: var(--text-normal);
 	vertical-align: middle;
 	border: none;
-	line-height: 1.2;
+	line-height: 1.1;
 }
 
 /* No vertical borders - only horizontal */
@@ -1593,12 +1596,10 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	font-weight: 500;
 	max-width: 500px;
 	word-wrap: break-word;
-}
-
-.kanban-table-cell-name {
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
+	gap: 0.35rem;
+	font-size: 0.7rem;
 }
 
 .kanban-table-status-button-container {
@@ -1611,14 +1612,14 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	background: none;
 	border: none;
 	cursor: pointer;
-	padding: 0.2rem;
-	border-radius: 4px;
+	padding: 0.15rem;
+	border-radius: 3px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	transition: all 0.2s ease;
-	width: 20px;
-	height: 20px;
+	width: 18px;
+	height: 18px;
 	flex-shrink: 0;
 }
 
@@ -1656,8 +1657,8 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .kanban-table-status-button svg {
-	width: 14px;
-	height: 14px;
+	width: 12px;
+	height: 12px;
 }
 
 .kanban-table-task-content {
@@ -1666,7 +1667,8 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	display: flex;
 	align-items: center;
 	flex-wrap: wrap;
-	gap: 0.35rem;
+	gap: 0.25rem;
+	font-size: 0.7rem;
 }
 
 .kanban-table-cell-name .kanban-tag {
@@ -1679,18 +1681,18 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .kanban-table-cell-tags .kanban-tag {
-	margin-right: 0.25rem;
-	margin-bottom: 0.25rem;
-	font-size: 0.6rem;
-	padding: 0.08rem 0.35rem;
+	margin-right: 0.2rem;
+	margin-bottom: 0.15rem;
+	font-size: 0.55rem;
+	padding: 0.05rem 0.25rem;
 }
 
 .kanban-table-cell-due-date,
 .kanban-table-cell-updated {
 	white-space: nowrap;
-	font-size: 0.65rem;
+	font-size: 0.6rem;
 	color: var(--text-muted);
-	min-width: 130px;
+	min-width: 110px;
 }
 
 .kanban-table-cell-due-date.overdue {
@@ -1706,9 +1708,9 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 .kanban-table-cell-time-spent,
 .kanban-table-cell-target-time {
 	font-family: var(--font-monospace);
-	font-size: 0.65rem;
+	font-size: 0.6rem;
 	white-space: nowrap;
-	min-width: 70px;
+	min-width: 60px;
 	text-align: left;
 }
 
@@ -1735,10 +1737,10 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .kanban-table-cell-actions {
-	min-width: 60px;
-	width: 60px;
+	min-width: 50px;
+	width: 50px;
 	text-align: center;
-	padding: 0.3rem 0.4rem !important;
+	padding: 0.2rem 0.3rem !important;
 }
 
 .kanban-table-cell-actions.running {
@@ -1756,14 +1758,14 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	background: none;
 	border: none;
 	cursor: pointer;
-	padding: 0.15rem;
+	padding: 0.1rem;
 	border-radius: 3px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	transition: all 0.2s ease;
-	width: 18px;
-	height: 18px;
+	width: 16px;
+	height: 16px;
 	flex-shrink: 0;
 }
 
@@ -1797,8 +1799,8 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .kanban-table-timer-button svg {
-	width: 12px;
-	height: 12px;
+	width: 11px;
+	height: 11px;
 }
 
 @keyframes timer-blink {
@@ -1812,22 +1814,22 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 
 /* Table progress bar cell */
 .kanban-table-cell-progress {
-	min-width: 100px;
-	width: 120px;
-	padding: 0.3rem 0.5rem !important;
+	min-width: 80px;
+	width: 100px;
+	padding: 0.2rem 0.4rem !important;
 }
 
 .kanban-table-progress-container {
 	display: flex;
 	flex-direction: column;
-	gap: 0.2rem;
+	gap: 0.15rem;
 }
 
 .kanban-table-progress-bar {
 	width: 100%;
-	height: 6px;
+	height: 4px;
 	background-color: var(--background-modifier-border);
-	border-radius: 3px;
+	border-radius: 2px;
 	overflow: hidden;
 }
 
@@ -1867,11 +1869,12 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 }
 
 .kanban-table-progress-text {
-	font-size: 0.65rem;
+	font-size: 0.6rem;
 	font-family: var(--font-monospace);
 	font-weight: 500;
 	text-align: center;
 	transition: color 0.3s ease;
+	line-height: 1;
 }
 
 .kanban-table-progress-text-green {

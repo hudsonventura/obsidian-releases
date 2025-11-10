@@ -1,16 +1,25 @@
 import { Modal, App, Setting } from "obsidian";
 import { ColumnState } from "../types";
 
-export class AddStatusModal extends Modal {
-	private callback: (statusName: string | null, statusType: ColumnState | null, icon: string | null) => void;
-	private statusName: string = "";
-	private statusType: ColumnState = "todo";
-	private statusIcon: string = "";
-	private existingStatuses: string[];
+export class EditStatusModal extends Modal {
+	private callback: (newName: string | null, statusType: ColumnState | null, icon: string | null) => void;
+	private statusType: ColumnState;
+	private statusIcon: string;
+	private statusName: string;
+	private newStatusName: string;
 
-	constructor(app: App, existingStatuses: string[], callback: (statusName: string | null, statusType: ColumnState | null, icon: string | null) => void) {
+	constructor(
+		app: App, 
+		statusName: string,
+		currentType: ColumnState,
+		currentIcon: string | undefined,
+		callback: (newName: string | null, statusType: ColumnState | null, icon: string | null) => void
+	) {
 		super(app);
-		this.existingStatuses = existingStatuses;
+		this.statusName = statusName;
+		this.newStatusName = statusName;
+		this.statusType = currentType;
+		this.statusIcon = currentIcon || "";
 		this.callback = callback;
 	}
 
@@ -18,33 +27,24 @@ export class AddStatusModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl("h2", { text: "Add New Status Column" });
+		contentEl.createEl("h2", { text: `Edit Status: ${this.statusName}` });
 		
 		contentEl.createEl("p", { 
-			text: "Create a custom status column for your kanban board.",
+			text: "Modify the status name, type, and icon for this column.",
 			cls: "setting-item-description"
 		});
 
 		// Status name input
-		let statusNameInput: any;
 		new Setting(contentEl)
 			.setName("Status name")
-			.setDesc("Enter the name for the new status (e.g., 'Review', 'Blocked', 'Testing')")
+			.setDesc("Change the name of this status column")
 			.addText((text) => {
-				statusNameInput = text;
 				text
 					.setPlaceholder("Status name...")
 					.setValue(this.statusName)
 					.onChange((value) => {
-						this.statusName = value;
+						this.newStatusName = value.trim();
 					});
-				text.inputEl.focus();
-				text.inputEl.addEventListener("keydown", (e) => {
-					if (e.key === "Enter") {
-						e.preventDefault();
-						this.submit();
-					}
-				});
 			});
 
 		// Status type selection
@@ -75,16 +75,6 @@ export class AddStatusModal extends Modal {
 					});
 			});
 
-		// Show existing statuses
-		if (this.existingStatuses.length > 0) {
-			const existingDiv = contentEl.createDiv("existing-statuses");
-			existingDiv.createEl("strong", { text: "Existing statuses:" });
-			const statusList = existingDiv.createEl("ul");
-			this.existingStatuses.forEach(status => {
-				statusList.createEl("li", { text: status });
-			});
-		}
-
 		// Buttons
 		const buttonContainer = contentEl.createDiv("modal-button-container");
 		buttonContainer.style.display = "flex";
@@ -95,7 +85,7 @@ export class AddStatusModal extends Modal {
 		new Setting(buttonContainer)
 			.addButton((btn) =>
 				btn
-					.setButtonText("Add Status")
+					.setButtonText("Save")
 					.setCta()
 					.onClick(() => {
 						this.submit();
@@ -112,26 +102,13 @@ export class AddStatusModal extends Modal {
 	}
 
 	private submit(): void {
-		const trimmedStatusName = this.statusName.trim();
-		
-		if (!trimmedStatusName) {
-			// Show error or just close
-			return;
-		}
-
-		// Check if status already exists (case-insensitive)
-		const statusExists = this.existingStatuses.some(
-			status => status.toLowerCase() === trimmedStatusName.toLowerCase()
-		);
-
-		if (statusExists) {
-			// Could show an error here
-			console.warn("Status already exists:", trimmedStatusName);
-			return;
-		}
-
 		this.close();
-		this.callback(trimmedStatusName, this.statusType, this.statusIcon || null);
+		const newName = this.newStatusName.trim();
+		if (newName && newName !== this.statusName) {
+			this.callback(newName, this.statusType, this.statusIcon || null);
+		} else {
+			this.callback(null, this.statusType, this.statusIcon || null);
+		}
 	}
 
 	onClose(): void {

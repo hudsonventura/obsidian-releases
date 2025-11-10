@@ -3,6 +3,7 @@ import { KanbanTask, KanbanData, KanbanStatus, TimerEntry, ColumnState, ColumnMe
 import { TimerEntriesModal } from "./timer-modal";
 import { AddTaskModal } from "./add-task-modal";
 import { AddStatusModal } from "./add-status-modal";
+import { EditStatusModal } from "./edit-status-modal";
 import { EditTagsModal } from "./edit-tags-modal";
 import { DueDateModal } from "./due-date-modal";
 import { EditTargetTimeModal } from "./edit-target-time-modal";
@@ -200,6 +201,27 @@ export function renderKanban(
 		}
 		return metadata?.state || "todo";
 	};
+
+	// Helper function to get column icon
+	const getColumnIcon = (status: KanbanStatus): string => {
+		// Try exact match first, then case-insensitive match
+		let metadata = data.columnMetadata?.find(m => m.name === status);
+		if (!metadata) {
+			metadata = data.columnMetadata?.find(m => m.name.toLowerCase() === status.toLowerCase());
+		}
+		// Return custom icon if available
+		if (metadata?.icon) {
+			return metadata.icon + " ";
+		}
+		// Otherwise return state-based emoji
+		const columnState = metadata?.state || getColumnState(status);
+		if (columnState === "in-progress") {
+			return "▶️ ";
+		} else if (columnState === "done") {
+			return "✅ ";
+		}
+		return "";
+	};
 	
 	// Initialize view mode (default to horizontal)
 	if (!data.view) {
@@ -320,12 +342,14 @@ export function renderKanban(
 		}
 	});
 	
-	// Filter state
-	let filterText = "";
+	// Filter state - restore from data if available
+	let filterText = data.filterText || "";
+	filterInput.value = filterText;
 	
 	// Filter input handler
 	filterInput.addEventListener("input", () => {
 		filterText = filterInput.value.toLowerCase().trim();
+		data.filterText = filterText; // Persist filter text
 		applyFilter();
 	});
 	
@@ -590,7 +614,8 @@ export function renderKanban(
 			const modal = new DueDateModal(
 				plugin.app,
 				task.dueDate,
-				async (newDate) => {
+				task.targetTime,
+				async (newDate, newTargetTime) => {
 					if (newDate === null) {
 						// Clear due date
 						task.dueDate = undefined;
@@ -599,12 +624,28 @@ export function renderKanban(
 						task.dueDate = newDate;
 					}
 					
-					// Update display
+					// Update target time
+					if (newTargetTime === null) {
+						// User cancelled, don't change target time
+					} else if (newTargetTime === "") {
+						// Clear target time
+						task.targetTime = undefined;
+					} else {
+						// Set new target time
+						task.targetTime = newTargetTime;
+					}
+					
+					// Update displays
 					updateDueDateDisplay();
+					updateTimerDisplay();
+					const updateProgressBar = (taskEl as any).updateProgressBar;
+					if (updateProgressBar) {
+						updateProgressBar();
+					}
 					
 					// Save to file
 					await saveTasksToFile(task.task);
-					console.log("Kanban: Due date updated:", task.dueDate);
+					console.log("Kanban: Due date updated:", task.dueDate, "Target time:", task.targetTime);
 				}
 			);
 			modal.open();
@@ -1376,8 +1417,8 @@ export function renderKanban(
 	
 	// Add status button handler - opens modal
 	addStatusButton.addEventListener("click", () => {
-		const modal = new AddStatusModal(plugin.app, statusColumns, async (newStatus) => {
-			if (!newStatus) return; // User cancelled
+		const modal = new AddStatusModal(plugin.app, statusColumns, async (newStatus, statusType, icon) => {
+			if (!newStatus || !statusType) return; // User cancelled
 			
 			// Add the new status to the columns array
 			if (!data.columns || data.columns.length === 0) {
@@ -1388,7 +1429,22 @@ export function renderKanban(
 			// Add the new status
 			data.columns.push(newStatus);
 			
-			console.log("Kanban: Adding new status column:", newStatus);
+			// Initialize columnMetadata if it doesn't exist
+			if (!data.columnMetadata) {
+				data.columnMetadata = [];
+			}
+			
+			// Add metadata for the new status column
+			const metadata: ColumnMetadata = {
+				name: newStatus,
+				state: statusType
+			};
+			if (icon) {
+				metadata.icon = icon;
+			}
+			data.columnMetadata.push(metadata);
+			
+			console.log("Kanban: Adding new status column:", newStatus, "with type:", statusType, "and icon:", icon);
 			console.log("Kanban: Current columns:", data.columns);
 			
 			// Save to file to persist the new column
@@ -1416,27 +1472,45 @@ export function renderKanban(
 			
 		// Find the first column with state "todo", otherwise use first available column
 		const firstStatus = statusColumns[0];
-		let targetColumn: HTMLElement | undefined;
 		let targetStatus: KanbanStatus = firstStatus;
 		
 		// Look for the first column with state "todo"
 		for (const status of statusColumns) {
 			const columnState = getColumnState(status);
 			if (columnState === "todo") {
-				targetColumn = columnElements.get(status);
 				targetStatus = status;
 				break;
 			}
 		}
 		
 		// If no column has state "todo", use the first column
-		if (!targetColumn && firstStatus) {
-			targetColumn = columnElements.get(firstStatus);
+		if (!targetStatus && firstStatus) {
 			targetStatus = firstStatus;
 		}
+		
+		if (!targetStatus) {
+			console.error("Kanban: Could not find any status to add task");
+			return;
+		}
+		
+		// Set the task status
+		newTask.status = targetStatus;
+		
+		// Handle different view modes
+		if (data.view === "table") {
+			// For table view, add task to tasksByStatus and re-render
+			const tasks = tasksByStatus.get(targetStatus) || [];
+			tasks.push(newTask);
+			tasksByStatus.set(targetStatus, tasks);
 			
+			// Re-render table view
+			renderTableView();
+			setTimeout(() => applyFilter(), 0);
+		} else {
+			// For kanban view (horizontal/vertical), find the column element
+			const targetColumn = columnElements.get(targetStatus);
 			if (!targetColumn) {
-				console.error("Kanban: Could not find any column to add task");
+				console.error("Kanban: Could not find column element for status:", targetStatus);
 				return;
 			}
 			
@@ -1446,9 +1520,6 @@ export function renderKanban(
 				return;
 			}
 			
-			// Set the task status to the target column
-			newTask.status = targetStatus;
-			
 			// Create and add the task element
 			const taskEl = createTaskElement(newTask, targetStatus, tasksContainer);
 			
@@ -1457,11 +1528,12 @@ export function renderKanban(
 				console.error("Kanban: Failed to add task to taskElements map");
 				return;
 			}
-			
-			// Update the file
-			await saveTasksToFile();
-			
-			console.log("Kanban: Created new task:", newTask.task, "in column:", targetStatus);
+		}
+		
+		// Update the file
+		await saveTasksToFile();
+		
+		console.log("Kanban: Created new task:", newTask.task, "in column:", targetStatus);
 		});
 		modal.open();
 	});
@@ -1493,6 +1565,9 @@ export function renderKanban(
 		
 		// Create table container
 		const tableContainer = boardEl.createDiv("kanban-table-container");
+		
+		// Shared variable to track which column is being dragged (accessible to all headers)
+		let draggedColumnStatus: string | null = null;
 		
 		// Render each status as a section
 		statusColumns.forEach(status => {
@@ -1530,6 +1605,13 @@ export function renderKanban(
 			const collapseBtn = sectionHeader.createEl("button", {
 				cls: "kanban-table-collapse-btn"
 			});
+			collapseBtn.setAttribute("aria-label", "Toggle section");
+			
+			// Prevent collapse button from triggering drag
+			collapseBtn.addEventListener("mousedown", (e) => {
+				e.stopPropagation();
+			});
+			
 			const chevronIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 			chevronIcon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
 			chevronIcon.setAttribute("width", "16");
@@ -1543,14 +1625,392 @@ export function renderKanban(
 			chevronIcon.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
 			collapseBtn.appendChild(chevronIcon);
 			
+			// Make section header draggable for reordering
+			sectionHeader.setAttr("draggable", "true");
+			sectionHeader.classList.add("kanban-column-header-draggable");
+			sectionHeader.setAttr("data-status", status);
+			
 			const sectionTitle = sectionHeader.createEl("h3", { cls: "kanban-table-section-title" });
-			const columnState = getColumnState(status);
-			const stateEmoji = columnState === "in-progress" ? "▶️ " : columnState === "done" ? "✅ " : "";
-			sectionTitle.setText(stateEmoji + displayName);
+			const updateSectionTitle = () => {
+				const columnIcon = getColumnIcon(status);
+				sectionTitle.setText(columnIcon + displayName);
+			};
+			updateSectionTitle();
 			
 			const taskCount = sectionHeader.createEl("span", {
 				cls: "kanban-table-task-count",
 				text: `${tasks.length}`
+			});
+			
+			// Drag handlers for column reordering
+			sectionHeader.addEventListener("dragstart", (e: DragEvent) => {
+				if (!e.dataTransfer) return;
+				e.stopPropagation(); // Prevent task drag from triggering
+				sectionHeader.classList.add("kanban-column-dragging");
+				e.dataTransfer.effectAllowed = "move";
+				e.dataTransfer.setData("application/x-kanban-column", status);
+				e.dataTransfer.setData("text/plain", status);
+				draggedColumnStatus = status; // Store in variable for dragover
+			});
+			
+			sectionHeader.addEventListener("dragend", (e: DragEvent) => {
+				sectionHeader.classList.remove("kanban-column-dragging");
+				draggedColumnStatus = null;
+				// Remove drop indicators
+				tableContainer.querySelectorAll(".kanban-column-drop-indicator").forEach(el => el.remove());
+				tableContainer.querySelectorAll(".kanban-column-drag-over").forEach(el => el.classList.remove("kanban-column-drag-over"));
+			});
+			
+			// Drop zone for column reordering
+			sectionHeader.addEventListener("dragover", (e: DragEvent) => {
+				e.preventDefault();
+				e.stopPropagation(); // Prevent task drag from triggering
+				if (!e.dataTransfer) return;
+				
+				// Use stored variable or try to get from dataTransfer
+				const draggedStatus = draggedColumnStatus || e.dataTransfer.getData("application/x-kanban-column");
+				if (!draggedStatus || draggedStatus === status) {
+					e.dataTransfer.dropEffect = "none";
+					sectionHeader.classList.remove("kanban-column-drag-over");
+					return;
+				}
+				
+				e.dataTransfer.dropEffect = "move";
+				sectionHeader.classList.add("kanban-column-drag-over");
+			});
+			
+			sectionHeader.addEventListener("dragleave", (e: DragEvent) => {
+				// Only remove if we're actually leaving the element (not just moving to a child)
+				const rect = sectionHeader.getBoundingClientRect();
+				const x = e.clientX;
+				const y = e.clientY;
+				if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+					sectionHeader.classList.remove("kanban-column-drag-over");
+				}
+			});
+			
+			sectionHeader.addEventListener("drop", async (e: DragEvent) => {
+				e.preventDefault();
+				e.stopPropagation(); // Prevent task drag from triggering
+				if (!e.dataTransfer) return;
+				
+				const draggedStatus = e.dataTransfer.getData("application/x-kanban-column") || draggedColumnStatus;
+				if (!draggedStatus || draggedStatus === status) {
+					sectionHeader.classList.remove("kanban-column-drag-over");
+					return;
+				}
+				
+				sectionHeader.classList.remove("kanban-column-drag-over");
+				draggedColumnStatus = null;
+				
+				console.log("Kanban: Reordering column", draggedStatus, "to position of", status);
+				console.log("Kanban: Current data.columns:", data.columns);
+				console.log("Kanban: Current statusColumns:", statusColumns);
+				
+				// Ensure data.columns exists
+				// If statusColumns is a reference to data.columns, we can modify data.columns directly
+				// If statusColumns is DEFAULT_COLUMNS, we need to create data.columns from it
+				if (!data.columns) {
+					// Create a new array from statusColumns (don't use reference)
+					data.columns = [...statusColumns];
+				} else if (statusColumns === data.columns) {
+					// They're the same reference, so data.columns is already the source of truth
+					// No need to sync
+				} else {
+					// They're different, sync data.columns with statusColumns
+					if (data.columns.length !== statusColumns.length || 
+						!data.columns.every((col, idx) => col === statusColumns[idx])) {
+						data.columns = [...statusColumns];
+					}
+				}
+				
+				const draggedColIndex = data.columns.indexOf(draggedStatus);
+				const targetColIndex = data.columns.indexOf(status);
+				
+				console.log("Kanban: Indices - dragged:", draggedColIndex, "target:", targetColIndex);
+				
+				if (draggedColIndex === -1 || targetColIndex === -1) {
+					console.warn("Kanban: Column not found in data.columns", { draggedStatus, status, columns: data.columns });
+					return;
+				}
+				
+				// Remove dragged column from its current position
+				data.columns.splice(draggedColIndex, 1);
+				
+				// Calculate insert position
+				// After removing the dragged item, insert at target position
+				// If we dragged forward, target index is unchanged. If backward, also unchanged.
+				const insertIndex = targetColIndex;
+				data.columns.splice(insertIndex, 0, draggedStatus);
+				
+				console.log("Kanban: New data.columns order:", data.columns);
+				
+				// Update statusColumns to match data.columns
+				// Note: statusColumns might be a reference to data.columns, so we need to be careful
+				// If they're the same reference, data.columns is already updated, so statusColumns is too
+				// If they're different (statusColumns is DEFAULT_COLUMNS), we need to update it
+				if (statusColumns !== data.columns) {
+					statusColumns.length = 0;
+					statusColumns.push(...data.columns);
+				}
+				
+				// Reorder columnMetadata to match the new column order
+				if (data.columnMetadata) {
+					const draggedMetadata = data.columnMetadata.find(m => m.name === draggedStatus);
+					const targetMetadata = data.columnMetadata.find(m => m.name === status);
+					
+					if (draggedMetadata && targetMetadata) {
+						const draggedMetaIndex = data.columnMetadata.indexOf(draggedMetadata);
+						const targetMetaIndex = data.columnMetadata.indexOf(targetMetadata);
+						
+						data.columnMetadata.splice(draggedMetaIndex, 1);
+						const insertMetaIndex = draggedMetaIndex < targetMetaIndex ? targetMetaIndex : targetMetaIndex;
+						data.columnMetadata.splice(insertMetaIndex, 0, draggedMetadata);
+					}
+				}
+				
+				console.log("Kanban: New column order:", data.columns);
+				
+				// Save and re-render
+				await updateKanbanInFile(plugin.app, ctx, "", "todo", originalSource, data).catch(err => {
+					console.error("Error reordering columns:", err);
+				});
+				
+				// Re-render table view
+				renderTableView();
+				setTimeout(() => applyFilter(), 0);
+			});
+
+			// Add context menu to section header
+			sectionHeader.addEventListener("contextmenu", (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				
+				const menu = new Menu();
+				const currentMetadata = data.columnMetadata?.find(m => m.name === status);
+				const currentState = currentMetadata?.state || getColumnState(status);
+				const currentIcon = currentMetadata?.icon;
+				
+				// Edit status option
+				menu.addItem((item) => {
+					item
+						.setTitle("Edit Status")
+						.setIcon("pencil")
+						.onClick(async () => {
+							const modal = new EditStatusModal(
+								plugin.app,
+								status,
+								currentState,
+								currentIcon,
+								async (newName, newType, newIcon) => {
+									if (newType === null) return; // User cancelled
+									
+									const oldStatus = status;
+									let updatedStatus = status;
+									
+									// Handle status name change
+									if (newName && newName !== oldStatus) {
+										updatedStatus = newName as KanbanStatus;
+										
+										// Get tasks from tasksByStatus BEFORE updating anything
+										const oldTasks = tasksByStatus.get(oldStatus) || [];
+										
+										// Update all tasks with the old status to use the new status
+										// Update both in data.tasks and in the tasks array from tasksByStatus
+										oldTasks.forEach(task => {
+											task.status = updatedStatus;
+										});
+										
+										if (data.tasks) {
+											data.tasks.forEach(task => {
+												if (task.status === oldStatus) {
+													task.status = updatedStatus;
+												}
+											});
+										}
+										
+										// Update status name in columns array
+										const statusIndex = data.columns?.indexOf(oldStatus);
+										if (statusIndex !== undefined && statusIndex >= 0 && data.columns) {
+											data.columns[statusIndex] = updatedStatus;
+										}
+										
+										// Update status name in statusColumns array
+										const statusColumnsIndex = statusColumns.indexOf(oldStatus);
+										if (statusColumnsIndex >= 0) {
+											statusColumns[statusColumnsIndex] = updatedStatus;
+										}
+										
+										// Update tasksByStatus map - move tasks from old status to new status
+										tasksByStatus.delete(oldStatus);
+										tasksByStatus.set(updatedStatus, oldTasks);
+									
+									// Update metadata name
+									const oldMetadata = data.columnMetadata?.find(m => m.name === oldStatus);
+									if (oldMetadata) {
+										oldMetadata.name = updatedStatus;
+									}
+									
+									// Update collapsed columns array if status is collapsed
+									if (data.collapsedColumns) {
+										const collapsedIndex = data.collapsedColumns.indexOf(oldStatus);
+										if (collapsedIndex >= 0) {
+											data.collapsedColumns[collapsedIndex] = updatedStatus;
+										}
+									}
+									
+									console.log("Kanban: Renamed status from", oldStatus, "to", updatedStatus);
+								}
+								
+								// Get or create metadata (using updated status name)
+								let metadata = data.columnMetadata?.find(m => m.name === updatedStatus);
+								if (!metadata) {
+									metadata = { name: updatedStatus, state: newType };
+									if (!data.columnMetadata) data.columnMetadata = [];
+									data.columnMetadata.push(metadata);
+								} else {
+									metadata.state = newType;
+									if (newIcon !== null) {
+										metadata.icon = newIcon;
+									} else {
+										delete metadata.icon;
+									}
+								}
+								
+								// Re-render the table view to reflect changes
+								renderTableView();
+									setTimeout(() => applyFilter(), 0);
+									
+									await updateKanbanInFile(plugin.app, ctx, "", "todo", originalSource, data).catch(err => {
+										console.error("Error saving status changes:", err);
+									});
+								}
+							);
+							modal.open();
+						});
+				});
+				
+				menu.addSeparator();
+				
+				// Status type options
+				menu.addItem((item) => {
+					item
+						.setTitle("Set as To Do State")
+						.setIcon("circle")
+						.setChecked(currentState === "todo")
+						.onClick(async () => {
+							let metadata = data.columnMetadata?.find(m => m.name === status);
+							if (!metadata) {
+								metadata = { name: status, state: "todo" };
+								if (!data.columnMetadata) data.columnMetadata = [];
+								data.columnMetadata.push(metadata);
+							} else {
+								metadata.state = "todo";
+							}
+							updateSectionTitle();
+							await updateKanbanInFile(plugin.app, ctx, "", "todo", originalSource, data).catch(err => {
+								console.error("Error saving status changes:", err);
+							});
+						});
+				});
+				
+				menu.addItem((item) => {
+					item
+						.setTitle("Set as In Progress State")
+						.setIcon("play")
+						.setChecked(currentState === "in-progress")
+						.onClick(async () => {
+							let metadata = data.columnMetadata?.find(m => m.name === status);
+							if (!metadata) {
+								metadata = { name: status, state: "in-progress" };
+								if (!data.columnMetadata) data.columnMetadata = [];
+								data.columnMetadata.push(metadata);
+							} else {
+								metadata.state = "in-progress";
+							}
+							updateSectionTitle();
+							await updateKanbanInFile(plugin.app, ctx, "", "todo", originalSource, data).catch(err => {
+								console.error("Error saving status changes:", err);
+							});
+						});
+				});
+				
+				menu.addItem((item) => {
+					item
+						.setTitle("Set as Pending State")
+						.setIcon("clock")
+						.setChecked(currentState === "pending")
+						.onClick(async () => {
+							let metadata = data.columnMetadata?.find(m => m.name === status);
+							if (!metadata) {
+								metadata = { name: status, state: "pending" };
+								if (!data.columnMetadata) data.columnMetadata = [];
+								data.columnMetadata.push(metadata);
+							} else {
+								metadata.state = "pending";
+							}
+							updateSectionTitle();
+							await updateKanbanInFile(plugin.app, ctx, "", "todo", originalSource, data).catch(err => {
+								console.error("Error saving status changes:", err);
+							});
+						});
+				});
+				
+				menu.addSeparator();
+				
+				// Exclude status option
+				menu.addItem((item) => {
+					item
+						.setTitle("Exclude Status")
+						.setIcon("trash")
+						.onClick(async () => {
+							// Find tasks in this status
+							const tasksInStatus = Array.from(taskElements.values())
+								.filter(info => info.task.status === status)
+								.map(info => info.task);
+							
+							// Find the first available status that's not this one
+							const otherStatuses = statusColumns.filter(s => s !== status);
+							const targetStatus = otherStatuses.length > 0 ? otherStatuses[0] : "todo";
+							
+							// Move all tasks to the target status
+							tasksInStatus.forEach(task => {
+								task.status = targetStatus as KanbanStatus;
+							});
+							
+							// Remove status from columns
+							if (data.columns) {
+								const index = data.columns.indexOf(status);
+								if (index > -1) {
+									data.columns.splice(index, 1);
+								}
+							}
+							
+							// Remove metadata
+							if (data.columnMetadata) {
+								const metadataIndex = data.columnMetadata.findIndex(m => m.name === status);
+								if (metadataIndex > -1) {
+									data.columnMetadata.splice(metadataIndex, 1);
+								}
+							}
+							
+							// Save and re-render
+							await updateKanbanInFile(plugin.app, ctx, "", "todo", originalSource, data).catch(err => {
+								console.error("Error excluding status:", err);
+							});
+							
+							// Re-render the view to reflect changes
+							if (data.view === "table") {
+								renderTableView();
+								setTimeout(() => applyFilter(), 0);
+							} else {
+								renderKanbanColumns();
+								setTimeout(() => applyFilter(), 0);
+							}
+						});
+				});
+				
+				menu.showAtMouseEvent(e);
 			});
 			
 			// Create table
@@ -1595,7 +2055,7 @@ export function renderKanban(
 					// Get or create column metadata
 					let metadata = data.columnMetadata?.find(m => m.name === status);
 					if (!metadata) {
-						metadata = { name: status, state: columnState, sortField: "updateDateTime", sortOrder: "desc" };
+						metadata = { name: status, state: getColumnState(status), sortField: "updateDateTime", sortOrder: "desc" };
 						if (!data.columnMetadata) data.columnMetadata = [];
 						data.columnMetadata.push(metadata);
 					}
@@ -1669,7 +2129,7 @@ export function renderKanban(
 			const getColumnMetadata = () => {
 				let metadata = data.columnMetadata?.find(m => m.name === status);
 				if (!metadata) {
-					metadata = { name: status, state: columnState, sortField: "updateDateTime", sortOrder: "desc" };
+					metadata = { name: status, state: getColumnState(status), sortField: "updateDateTime", sortOrder: "desc" };
 					if (!data.columnMetadata) data.columnMetadata = [];
 					data.columnMetadata.push(metadata);
 				}
@@ -1888,10 +2348,14 @@ export function renderKanban(
 		if (data.columnWidths?.dueDate) {
 			dueDateCell.style.width = data.columnWidths.dueDate + "px";
 		}
-		if (task.dueDate) {
+		
+		// Function to update due date display
+		const updateDueDateDisplay = () => {
+			if (task.dueDate) {
 				const dueDate = moment(task.dueDate);
 				const now = moment();
 				dueDateCell.setText(dueDate.format("ddd, YYYY-MM-DD HH:mm"));
+				dueDateCell.removeClass("overdue", "soon");
 				
 				if (dueDate.isBefore(now)) {
 					dueDateCell.addClass("overdue");
@@ -1900,7 +2364,50 @@ export function renderKanban(
 				}
 			} else {
 				dueDateCell.setText("—");
+				dueDateCell.removeClass("overdue", "soon");
 			}
+		};
+		updateDueDateDisplay();
+		
+		// Make due date cell editable on double-click
+		dueDateCell.style.cursor = "pointer";
+		dueDateCell.addEventListener("dblclick", (e) => {
+			e.stopPropagation();
+			const modal = new DueDateModal(
+				plugin.app,
+				task.dueDate,
+				task.targetTime,
+				async (newDate, newTargetTime) => {
+					if (newDate === null) {
+						task.dueDate = undefined;
+					} else {
+						task.dueDate = newDate;
+					}
+					
+					// Update target time
+					if (newTargetTime === null) {
+						// User cancelled, don't change target time
+					} else if (newTargetTime === "") {
+						// Clear target time
+						task.targetTime = undefined;
+					} else {
+						// Set new target time
+						task.targetTime = newTargetTime;
+					}
+					
+					updateDueDateDisplay();
+					updateTimerDisplay();
+					const updateProgressBar = (row as any).updateProgressBar;
+					if (updateProgressBar) {
+						updateProgressBar();
+					}
+					renderTableView();
+					setTimeout(() => applyFilter(), 0);
+					await saveTasksToFile(task.task);
+				}
+			);
+			modal.open();
+		});
 				
 		// Last updated cell
 		const updatedCell = row.createEl("td", { cls: "kanban-table-cell-updated" });
@@ -1941,6 +2448,7 @@ export function renderKanban(
 				timeSpentDisplay.setText("—");
 				timeSpentDisplay.addClass("empty");
 			}
+
 			
 			// Update target time
 			if (task.targetTime) {
@@ -1974,6 +2482,7 @@ export function renderKanban(
 				row.removeClass("timer-running");
 			}
 		}
+
 			
 			// Progress bar cell
 			const progressCell = row.createEl("td", { cls: "kanban-table-cell-progress" });
@@ -2053,21 +2562,21 @@ export function renderKanban(
 				(row as any).updateProgressBar = updateProgressBar;
 			
 			// Actions cell with timer buttons
-			const actionsCell = row.createEl("td", { cls: "kanban-table-cell-actions" });
+			actionsCell = row.createEl("td", { cls: "kanban-table-cell-actions" });
 			if (data.columnWidths?.actions) {
 				actionsCell.style.width = data.columnWidths.actions + "px";
 			}
 			const timerButtons = actionsCell.createDiv("kanban-table-timer-buttons");
 				
 				// Start button
-				const startButton = timerButtons.createEl("button", {
+				startButton = timerButtons.createEl("button", {
 					cls: "kanban-table-timer-button kanban-table-timer-start",
 					attr: { "aria-label": "Start timer" }
 				});
 				startButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
 				
 				// Stop button
-				const stopButton = timerButtons.createEl("button", {
+				stopButton = timerButtons.createEl("button", {
 					cls: "kanban-table-timer-button kanban-table-timer-stop",
 					attr: { "aria-label": "Stop timer" }
 				});
@@ -2135,19 +2644,32 @@ export function renderKanban(
 					});
 					
 					menu.addItem((item) => {
-						item.setTitle("Edit Due Date").setIcon("calendar").onClick(() => {
+						item.setTitle("Edit Due Date & Target Time").setIcon("calendar").onClick(() => {
 							const modal = new DueDateModal(
 								plugin.app,
 								task.dueDate,
-								async (newDate) => {
+								task.targetTime,
+								async (newDate, newTargetTime) => {
 									if (newDate === null) {
 										task.dueDate = undefined;
 									} else {
-									task.dueDate = newDate;
-								}
-								renderTableView();
-								setTimeout(() => applyFilter(), 0);
-								await saveTasksToFile(task.task);
+										task.dueDate = newDate;
+									}
+									
+									// Update target time
+									if (newTargetTime === null) {
+										// User cancelled, don't change target time
+									} else if (newTargetTime === "") {
+										// Clear target time
+										task.targetTime = undefined;
+									} else {
+										// Set new target time
+										task.targetTime = newTargetTime;
+									}
+									
+									renderTableView();
+									setTimeout(() => applyFilter(), 0);
+									await saveTasksToFile(task.task);
 								}
 							);
 							modal.open();
@@ -2274,6 +2796,9 @@ export function renderKanban(
 				
 				if (!movedTask || !movedTaskEl) return;
 				
+				// Store movedTask in a const to help TypeScript
+				const taskToMove = movedTask;
+				
 				// Remove the old element from DOM and taskElements
 				taskElements.delete(movedTaskEl);
 				movedTaskEl.remove();
@@ -2282,13 +2807,12 @@ export function renderKanban(
 				const oldColumnState = getColumnState(sourceStatus);
 				const newColumnState = getColumnState(status);
 				
-				// Update task status
-				movedTask.task.status = status;
-				movedTask.task.updateDateTime = moment().toISOString();
-				movedTask.status = status;
-				
 				// Timer logic: Start timer if moving to in-progress, stop if moving away
 				if (sourceStatus !== status) {
+					// Only update task status if moving to a different status
+					taskToMove.task.status = status;
+					taskToMove.task.updateDateTime = moment().toISOString();
+					taskToMove.status = status;
 					// Only apply timer logic when actually changing status
 					if (newColumnState === "in-progress") {
 						// Moving to in-progress - start timer
@@ -2300,58 +2824,84 @@ export function renderKanban(
 							}
 						});
 						
+						// Also stop timers in tasksByStatus (in case taskElements is out of sync)
+						tasksByStatus.forEach((tasks) => {
+							tasks.forEach((t) => {
+								if (t.task !== taskToMove.task.task && isTaskTimerRunning(t)) {
+									stopTaskTimer(t);
+									console.log("Kanban: Auto-stopped timer for task (from tasksByStatus):", t.task);
+								}
+							});
+						});
+						
 						// Start timer for this task if not already running
-						if (!isTaskTimerRunning(movedTask.task)) {
-							startTaskTimer(movedTask.task);
-							console.log("Kanban: Auto-started timer for task:", movedTask.task.task);
+						if (!isTaskTimerRunning(taskToMove.task)) {
+							startTaskTimer(taskToMove.task);
+							console.log("Kanban: Auto-started timer for task:", taskToMove.task.task, "Timer entries:", taskToMove.task.timerEntries);
 						}
 					} else if (oldColumnState === "in-progress") {
 						// Moving away from in-progress - stop timer
-						if (isTaskTimerRunning(movedTask.task)) {
-							stopTaskTimer(movedTask.task);
-							console.log("Kanban: Auto-stopped timer for task:", movedTask.task.task);
+						if (isTaskTimerRunning(taskToMove.task)) {
+							stopTaskTimer(taskToMove.task);
+							console.log("Kanban: Auto-stopped timer for task:", taskToMove.task.task);
 						}
 					}
 				}
 				
 				// Handle reordering within same status or moving to different status
-				if (sourceStatus === status && draggedOverRow) {
-					// Reordering within same status
-					const targetTaskName = draggedOverRow.getAttribute("data-task");
-					
-					// Don't do anything if dropping on itself
-					if (targetTaskName === taskText) {
-					console.log("Kanban: Dropped task on itself, ignoring");
-					draggedOverRow = null;
-					renderTableView();
-					setTimeout(() => applyFilter(), 0);
-					return;
+				if (sourceStatus === status) {
+					// Reordering within same status - don't change status or updateDateTime
+					if (draggedOverRow) {
+						const targetTaskName = draggedOverRow.getAttribute("data-task");
+						
+						// Don't do anything if dropping on itself
+						if (targetTaskName === taskText) {
+							console.log("Kanban: Dropped task on itself, ignoring");
+							draggedOverRow = null;
+							renderTableView();
+							setTimeout(() => applyFilter(), 0);
+							return;
+						}
+						
+						const statusTasks = tasksByStatus.get(status) || [];
+						
+						// Find original indices
+						const sourceIndex = statusTasks.findIndex(t => t.task === taskText);
+						const targetIndexOriginal = statusTasks.findIndex(t => t.task === targetTaskName);
+						
+						if (sourceIndex < 0 || targetIndexOriginal < 0) {
+							console.warn("Kanban: Could not find source or target task in array");
+							return;
+						}
+						
+						// Remove the moved task from its current position
+						const [movedTaskObj] = statusTasks.splice(sourceIndex, 1);
+						
+						// Recalculate target index after removal
+						const newTargetIndex = statusTasks.findIndex(t => t.task === targetTaskName);
+						
+						// Insert at the correct position
+						const insertIndex = insertBefore ? newTargetIndex : newTargetIndex + 1;
+						statusTasks.splice(insertIndex, 0, movedTaskObj);
+						tasksByStatus.set(status, statusTasks);
+						
+						console.log("Kanban: Reordered task", taskText, "within", status, "from index", sourceIndex, "to", insertIndex);
+					} else {
+						// Dropping in empty area of same status - move to end
+						const statusTasks = tasksByStatus.get(status) || [];
+						const sourceIndex = statusTasks.findIndex(t => t.task === taskText);
+						
+						if (sourceIndex >= 0) {
+							// Remove from current position
+							const [movedTaskObj] = statusTasks.splice(sourceIndex, 1);
+							// Add to end
+							statusTasks.push(movedTaskObj);
+							tasksByStatus.set(status, statusTasks);
+							
+							console.log("Kanban: Moved task", taskText, "to end of", status);
+						}
 					}
-					
-					const statusTasks = tasksByStatus.get(status) || [];
-					
-					// Find original indices
-					const sourceIndex = statusTasks.findIndex(t => t.task === taskText);
-					const targetIndexOriginal = statusTasks.findIndex(t => t.task === targetTaskName);
-					
-					if (sourceIndex < 0 || targetIndexOriginal < 0) {
-						console.warn("Kanban: Could not find source or target task in array");
-						return;
-					}
-					
-					// Remove the moved task from its current position
-					const [movedTaskObj] = statusTasks.splice(sourceIndex, 1);
-					
-					// Recalculate target index after removal
-					const newTargetIndex = statusTasks.findIndex(t => t.task === targetTaskName);
-					
-					// Insert at the correct position
-					const insertIndex = insertBefore ? newTargetIndex : newTargetIndex + 1;
-					statusTasks.splice(insertIndex, 0, movedTaskObj);
-					tasksByStatus.set(status, statusTasks);
-					
-					console.log("Kanban: Reordered task", taskText, "within", status, "from index", sourceIndex, "to", insertIndex);
-				} else {
+				} else if (sourceStatus !== status) {
 					// Moving to different status
 					const oldStatusTasks = tasksByStatus.get(sourceStatus) || [];
 					const filteredOldTasks = oldStatusTasks.filter(t => t.task !== taskText);
@@ -2365,23 +2915,47 @@ export function renderKanban(
 						
 						// Safety check - don't insert if target is the same task
 						if (targetTaskName === taskText) {
-							if (!newStatusTasks.find(t => t.task === taskText)) {
-								newStatusTasks.push(movedTask.task);
+							const existingIndex = newStatusTasks.findIndex(t => t.task === taskText);
+							if (existingIndex >= 0) {
+								// Update existing task with timer state
+								newStatusTasks[existingIndex] = taskToMove.task;
+							} else {
+								newStatusTasks.push(taskToMove.task);
 							}
 						} else {
 							const targetIndex = newStatusTasks.findIndex(t => t.task === targetTaskName);
 							
 							if (targetIndex >= 0) {
 								const insertIndex = insertBefore ? targetIndex : targetIndex + 1;
-								newStatusTasks.splice(insertIndex, 0, movedTask.task);
+								// Remove existing task if it exists, then insert at correct position
+								const existingIndex = newStatusTasks.findIndex(t => t.task === taskText);
+								if (existingIndex >= 0) {
+									newStatusTasks.splice(existingIndex, 1);
+									// Recalculate target index after removal
+									const newTargetIndex = newStatusTasks.findIndex(t => t.task === targetTaskName);
+									const finalInsertIndex = insertBefore ? newTargetIndex : newTargetIndex + 1;
+									newStatusTasks.splice(finalInsertIndex, 0, taskToMove.task);
+								} else {
+									newStatusTasks.splice(insertIndex, 0, taskToMove.task);
+								}
 							} else {
-								newStatusTasks.push(movedTask.task);
+								// Remove existing task if it exists, then add
+								const existingIndex = newStatusTasks.findIndex(t => t.task === taskText);
+								if (existingIndex >= 0) {
+									newStatusTasks[existingIndex] = taskToMove.task;
+								} else {
+									newStatusTasks.push(taskToMove.task);
+								}
 							}
 						}
 					} else {
 						// Add at the end if no specific position
-						if (!newStatusTasks.find(t => t.task === taskText)) {
-							newStatusTasks.push(movedTask.task);
+						const existingIndex = newStatusTasks.findIndex(t => t.task === taskText);
+						if (existingIndex >= 0) {
+							// Update existing task with timer state
+							newStatusTasks[existingIndex] = taskToMove.task;
+						} else {
+							newStatusTasks.push(taskToMove.task);
 						}
 					}
 					
@@ -2415,11 +2989,21 @@ export function renderKanban(
 		// Column header
 		const headerEl = columnEl.createDiv("kanban-column-header");
 		
+		// Make header draggable for reordering
+		headerEl.setAttr("draggable", "true");
+		headerEl.classList.add("kanban-column-header-draggable");
+		headerEl.setAttr("data-status", status);
+		
 		// Collapse button
 		const collapseBtn = headerEl.createEl("button", {
 			cls: "kanban-column-collapse-btn"
 		});
 		collapseBtn.setAttribute("aria-label", "Toggle column");
+		
+		// Prevent collapse button from triggering drag
+		collapseBtn.addEventListener("mousedown", (e) => {
+			e.stopPropagation();
+		});
 		
 		// Chevron icon
 		const chevronIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -2437,13 +3021,110 @@ export function renderKanban(
 		
 		const headerTitle = headerEl.createEl("h3");
 		
-		// Add state indicator to title
+		// Add icon to title
 		const updateHeaderTitle = () => {
-			const columnState = getColumnState(status);
-			const stateEmoji = columnState === "in-progress" ? "▶️ " : columnState === "done" ? "✅ " : "";
-			headerTitle.setText(stateEmoji + displayName);
+			const columnIcon = getColumnIcon(status);
+			headerTitle.setText(columnIcon + displayName);
 		};
 		updateHeaderTitle();
+		
+		// Drag handlers for column reordering
+		headerEl.addEventListener("dragstart", (e: DragEvent) => {
+			if (!e.dataTransfer) return;
+			e.stopPropagation(); // Prevent task drag from triggering
+			headerEl.classList.add("kanban-column-dragging");
+			e.dataTransfer.effectAllowed = "move";
+			e.dataTransfer.setData("application/x-kanban-column", status);
+			e.dataTransfer.setData("text/plain", status);
+		});
+		
+		headerEl.addEventListener("dragend", (e: DragEvent) => {
+			headerEl.classList.remove("kanban-column-dragging");
+			// Remove drop indicators
+			boardEl.querySelectorAll(".kanban-column-drop-indicator").forEach(el => el.remove());
+			boardEl.querySelectorAll(".kanban-column-drag-over").forEach(el => el.classList.remove("kanban-column-drag-over"));
+		});
+		
+		// Drop zone for column reordering
+		headerEl.addEventListener("dragover", (e: DragEvent) => {
+			e.preventDefault();
+			e.stopPropagation(); // Prevent task drag from triggering
+			if (!e.dataTransfer) return;
+			
+			const draggedStatus = e.dataTransfer.getData("application/x-kanban-column");
+			if (!draggedStatus || draggedStatus === status) {
+				e.dataTransfer.dropEffect = "none";
+				return;
+			}
+			
+			e.dataTransfer.dropEffect = "move";
+			headerEl.classList.add("kanban-column-drag-over");
+		});
+		
+		headerEl.addEventListener("dragleave", (e: DragEvent) => {
+			headerEl.classList.remove("kanban-column-drag-over");
+		});
+		
+		headerEl.addEventListener("drop", async (e: DragEvent) => {
+			e.preventDefault();
+			e.stopPropagation(); // Prevent task drag from triggering
+			if (!e.dataTransfer) return;
+			
+			const draggedStatus = e.dataTransfer.getData("application/x-kanban-column");
+			if (!draggedStatus || draggedStatus === status) {
+				return;
+			}
+			
+			headerEl.classList.remove("kanban-column-drag-over");
+			
+			// Reorder columns
+			const currentIndex = statusColumns.indexOf(status);
+			const draggedIndex = statusColumns.indexOf(draggedStatus);
+			
+			if (currentIndex === -1 || draggedIndex === -1) return;
+			
+			// Remove dragged column from its current position
+			statusColumns.splice(draggedIndex, 1);
+			
+			// Insert at new position
+			const newIndex = draggedIndex < currentIndex ? currentIndex : currentIndex + 1;
+			statusColumns.splice(newIndex, 0, draggedStatus);
+			
+			// Update data.columns to match
+			if (data.columns) {
+				const draggedColIndex = data.columns.indexOf(draggedStatus);
+				if (draggedColIndex > -1) {
+					data.columns.splice(draggedColIndex, 1);
+					const targetColIndex = data.columns.indexOf(status);
+					const insertIndex = draggedColIndex < targetColIndex ? targetColIndex : targetColIndex + 1;
+					data.columns.splice(insertIndex, 0, draggedStatus);
+				}
+			}
+			
+			// Reorder columnMetadata to match the new column order
+			if (data.columnMetadata) {
+				const draggedMetadata = data.columnMetadata.find(m => m.name === draggedStatus);
+				const targetMetadata = data.columnMetadata.find(m => m.name === status);
+				
+				if (draggedMetadata && targetMetadata) {
+					const draggedMetaIndex = data.columnMetadata.indexOf(draggedMetadata);
+					const targetMetaIndex = data.columnMetadata.indexOf(targetMetadata);
+					
+					data.columnMetadata.splice(draggedMetaIndex, 1);
+					const insertMetaIndex = draggedMetaIndex < targetMetaIndex ? targetMetaIndex : targetMetaIndex + 1;
+					data.columnMetadata.splice(insertMetaIndex, 0, draggedMetadata);
+				}
+			}
+			
+			// Save and re-render
+			await updateKanbanInFile(plugin.app, ctx, "", "todo", originalSource, data).catch(err => {
+				console.error("Error reordering columns:", err);
+			});
+			
+			// Re-render kanban columns
+			renderKanbanColumns();
+			setTimeout(() => applyFilter(), 0);
+		});
 		
 		// Task count badge
 		const taskCountBadge = headerEl.createEl("span", {
@@ -2555,21 +3236,133 @@ export function renderKanban(
 			e.stopPropagation();
 			
 			const menu = new Menu();
-			const currentState = getColumnState(status);
+			const currentMetadata = data.columnMetadata?.find(m => m.name === status);
+			const currentState = currentMetadata?.state || getColumnState(status);
+			const currentIcon = currentMetadata?.icon;
 			
+			// Edit status option
+			menu.addItem((item) => {
+				item
+					.setTitle("Edit Status")
+					.setIcon("pencil")
+					.onClick(async () => {
+						const modal = new EditStatusModal(
+							plugin.app,
+							status,
+							currentState,
+							currentIcon,
+							async (newName, newType, newIcon) => {
+								if (newType === null) return; // User cancelled
+								
+								const oldStatus = status;
+								let updatedStatus = status;
+								
+								// Handle status name change
+								if (newName && newName !== oldStatus) {
+									updatedStatus = newName as KanbanStatus;
+									
+									// Get tasks from tasksByStatus BEFORE updating anything
+									const oldTasks = tasksByStatus.get(oldStatus) || [];
+									
+									// Update all tasks with the old status to use the new status
+									// Update both in data.tasks and in the tasks array from tasksByStatus
+									oldTasks.forEach(task => {
+										task.status = updatedStatus;
+									});
+									
+									if (data.tasks) {
+										data.tasks.forEach(task => {
+											if (task.status === oldStatus) {
+												task.status = updatedStatus;
+											}
+										});
+									}
+									
+									// Update status name in columns array
+									const statusIndex = data.columns?.indexOf(oldStatus);
+									if (statusIndex !== undefined && statusIndex >= 0 && data.columns) {
+										data.columns[statusIndex] = updatedStatus;
+									}
+									
+									// Update status name in statusColumns array
+									const statusColumnsIndex = statusColumns.indexOf(oldStatus);
+									if (statusColumnsIndex >= 0) {
+										statusColumns[statusColumnsIndex] = updatedStatus;
+									}
+									
+									// Update tasksByStatus map - move tasks from old status to new status
+									tasksByStatus.delete(oldStatus);
+									tasksByStatus.set(updatedStatus, oldTasks);
+									
+									// Update metadata name
+									const oldMetadata = data.columnMetadata?.find(m => m.name === oldStatus);
+									if (oldMetadata) {
+										oldMetadata.name = updatedStatus;
+									}
+									
+									// Update collapsed columns array if status is collapsed
+									if (data.collapsedColumns) {
+										const collapsedIndex = data.collapsedColumns.indexOf(oldStatus);
+										if (collapsedIndex >= 0) {
+											data.collapsedColumns[collapsedIndex] = updatedStatus;
+										}
+									}
+									
+									console.log("Kanban: Renamed status from", oldStatus, "to", updatedStatus);
+								}
+								
+								// Get or create metadata (using updated status name)
+								let metadata = data.columnMetadata?.find(m => m.name === updatedStatus);
+								if (!metadata) {
+									metadata = { name: updatedStatus, state: newType };
+									if (!data.columnMetadata) data.columnMetadata = [];
+									data.columnMetadata.push(metadata);
+								} else {
+									metadata.state = newType;
+									if (newIcon !== null) {
+										metadata.icon = newIcon;
+									} else {
+										delete metadata.icon;
+									}
+								}
+								
+								// Re-render the kanban view to reflect changes
+								if (data.view === "table") {
+									renderTableView();
+									setTimeout(() => applyFilter(), 0);
+								} else {
+									renderKanbanColumns();
+								}
+								
+								updateHeaderTitle();
+								await saveCollapsedState();
+								console.log("Kanban: Updated column", updatedStatus, "type:", newType, "icon:", newIcon);
+							}
+						);
+						modal.open();
+					});
+			});
+			
+			menu.addSeparator();
+			
+			// Status type options
 			menu.addItem((item) => {
 				item
 					.setTitle("Set as To Do State")
 					.setIcon("circle")
 					.setChecked(currentState === "todo")
 					.onClick(async () => {
-						const metadata = data.columnMetadata?.find(m => m.name === status);
-						if (metadata) {
+						let metadata = data.columnMetadata?.find(m => m.name === status);
+						if (!metadata) {
+							metadata = { name: status, state: "todo" };
+							if (!data.columnMetadata) data.columnMetadata = [];
+							data.columnMetadata.push(metadata);
+						} else {
 							metadata.state = "todo";
-							updateHeaderTitle();
-							await saveCollapsedState();
-							console.log("Kanban: Set column", status, "to todo state");
 						}
+						updateHeaderTitle();
+						await saveCollapsedState();
+						console.log("Kanban: Set column", status, "to todo state");
 					});
 			});
 			
@@ -2579,28 +3372,90 @@ export function renderKanban(
 					.setIcon("play")
 					.setChecked(currentState === "in-progress")
 					.onClick(async () => {
-						const metadata = data.columnMetadata?.find(m => m.name === status);
-						if (metadata) {
+						let metadata = data.columnMetadata?.find(m => m.name === status);
+						if (!metadata) {
+							metadata = { name: status, state: "in-progress" };
+							if (!data.columnMetadata) data.columnMetadata = [];
+							data.columnMetadata.push(metadata);
+						} else {
 							metadata.state = "in-progress";
-							updateHeaderTitle();
-							await saveCollapsedState();
-							console.log("Kanban: Set column", status, "to in-progress state");
 						}
+						updateHeaderTitle();
+						await saveCollapsedState();
+						console.log("Kanban: Set column", status, "to in-progress state");
 					});
 			});
 			
 			menu.addItem((item) => {
 				item
-					.setTitle("Set as Done State")
-					.setIcon("check")
-					.setChecked(currentState === "done")
+					.setTitle("Set as Pending State")
+					.setIcon("clock")
+					.setChecked(currentState === "pending")
 					.onClick(async () => {
-						const metadata = data.columnMetadata?.find(m => m.name === status);
-						if (metadata) {
-							metadata.state = "done";
-							updateHeaderTitle();
-							await saveCollapsedState();
-							console.log("Kanban: Set column", status, "to done state");
+						let metadata = data.columnMetadata?.find(m => m.name === status);
+						if (!metadata) {
+							metadata = { name: status, state: "pending" };
+							if (!data.columnMetadata) data.columnMetadata = [];
+							data.columnMetadata.push(metadata);
+						} else {
+							metadata.state = "pending";
+						}
+						updateHeaderTitle();
+						await saveCollapsedState();
+						console.log("Kanban: Set column", status, "to pending state");
+					});
+			});
+			
+			menu.addSeparator();
+			
+			// Exclude status option
+			menu.addItem((item) => {
+				item
+					.setTitle("Exclude Status")
+					.setIcon("trash")
+					.onClick(async () => {
+						// Find tasks in this status
+						const tasksInStatus = Array.from(taskElements.values())
+							.filter(info => info.task.status === status)
+							.map(info => info.task);
+						
+						// Find the first available status that's not this one
+						const otherStatuses = statusColumns.filter(s => s !== status);
+						const targetStatus = otherStatuses.length > 0 ? otherStatuses[0] : "todo";
+						
+						// Move all tasks to the target status
+						tasksInStatus.forEach(task => {
+							task.status = targetStatus as KanbanStatus;
+						});
+						
+						// Remove status from columns
+						if (data.columns) {
+							const index = data.columns.indexOf(status);
+							if (index > -1) {
+								data.columns.splice(index, 1);
+							}
+						}
+						
+						// Remove metadata
+						if (data.columnMetadata) {
+							const metadataIndex = data.columnMetadata.findIndex(m => m.name === status);
+							if (metadataIndex > -1) {
+								data.columnMetadata.splice(metadataIndex, 1);
+							}
+						}
+						
+						// Save and re-render
+						await updateKanbanInFile(plugin.app, ctx, "", "todo", originalSource, data).catch(err => {
+							console.error("Error excluding status:", err);
+						});
+						
+						// Re-render the view to reflect changes
+						if (data.view === "table") {
+							renderTableView();
+							setTimeout(() => applyFilter(), 0);
+						} else {
+							renderKanbanColumns();
+							setTimeout(() => applyFilter(), 0);
 						}
 					});
 			});
@@ -2928,13 +3783,7 @@ export function renderKanban(
 					}
 				}
 				
-				// Update timestamp
-				taskInfo.task.updateDateTime = moment().toISOString();
-				const updateDateTimeUpdateFn = (taskEl as any).updateUpdateDateTimeDisplay;
-				if (updateDateTimeUpdateFn) {
-					updateDateTimeUpdateFn();
-				}
-				
+				// Don't update timestamp or status when reordering within same column
 				console.log("Kanban: Reordered task", taskText, "within", targetStatus, "from index", sourceIndex, "to", insertIndex);
 				
 				// Save changes
