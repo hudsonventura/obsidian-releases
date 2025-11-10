@@ -1564,6 +1564,7 @@ export function renderKanban(
 			{ label: "Due Date", field: "dueDate" as SortField, key: "dueDate" },
 			{ label: "Last Updated", field: "updateDateTime" as SortField, key: "lastUpdated" },
 			{ label: "Time Spent", field: "timeSpent" as SortField, key: "timeSpent" },
+			{ label: "Target Time", field: "targetTime" as SortField, key: "targetTime" },
 			{ label: "Progress", field: null, key: "progress" }, // Progress bar column
 			{ label: "", field: null, key: "actions" } // Actions column for timer buttons
 		];
@@ -1695,23 +1696,28 @@ export function renderKanban(
 							const bDue = b.dueDate ? moment(b.dueDate).valueOf() : Number.MAX_SAFE_INTEGER;
 							comparison = aDue - bDue;
 							break;
-						case "title":
-							comparison = a.task.localeCompare(b.task);
-							break;
-						case "timeSpent":
-							const aTime = getTaskTimerDuration(a);
-							const bTime = getTaskTimerDuration(b);
-							comparison = aTime - bTime;
-							break;
-					}
-					
-					return metadata.sortOrder === "asc" ? comparison : -comparison;
-				});
+					case "title":
+						comparison = a.task.localeCompare(b.task);
+						break;
+					case "timeSpent":
+						const aTime = getTaskTimerDuration(a);
+						const bTime = getTaskTimerDuration(b);
+						comparison = aTime - bTime;
+						break;
+					case "targetTime":
+						const aTarget = parseTargetTime(a.targetTime);
+						const bTarget = parseTargetTime(b.targetTime);
+						comparison = aTarget - bTarget;
+						break;
+				}
 				
-				return sorted;
-			};
+				return metadata.sortOrder === "asc" ? comparison : -comparison;
+			});
 			
-			const sortedTasks = sortTasks(tasks);
+			return sorted;
+		};
+		
+		const sortedTasks = sortTasks(tasks);
 			
 			// Render task rows
 			sortedTasks.forEach(task => {
@@ -1908,48 +1914,66 @@ export function renderKanban(
 				updatedCell.setText("—");
 			}
 			
-			// Time spent cell
-			const timeSpentCell = row.createEl("td", { cls: "kanban-table-cell-time-spent" });
-			if (data.columnWidths?.timeSpent) {
-				timeSpentCell.style.width = data.columnWidths.timeSpent + "px";
+		// Time spent cell
+		const timeSpentCell = row.createEl("td", { cls: "kanban-table-cell-time-spent" });
+		if (data.columnWidths?.timeSpent) {
+			timeSpentCell.style.width = data.columnWidths.timeSpent + "px";
+		}
+		const timeSpentDisplay = timeSpentCell.createSpan("kanban-table-time-display");
+		
+		// Target time cell
+		const targetTimeCell = row.createEl("td", { cls: "kanban-table-cell-target-time" });
+		if (data.columnWidths?.targetTime) {
+			targetTimeCell.style.width = data.columnWidths.targetTime + "px";
+		}
+		const targetTimeDisplay = targetTimeCell.createSpan("kanban-table-time-display");
+		
+		// Function to update timer display
+		const updateTimerDisplay = () => {
+			const totalDuration = getTaskTimerDuration(task);
+			const isRunning = isTaskTimerRunning(task);
+			
+			// Update spent time
+			if (totalDuration > 0) {
+				timeSpentDisplay.setText(formatTimerDuration(totalDuration));
+				timeSpentDisplay.removeClass("empty");
+			} else {
+				timeSpentDisplay.setText("—");
+				timeSpentDisplay.addClass("empty");
 			}
-			const timeDisplay = timeSpentCell.createSpan("kanban-table-time-display");
-				
-				// Function to update timer display
-				const updateTimerDisplay = () => {
-					const totalDuration = getTaskTimerDuration(task);
-					const isRunning = isTaskTimerRunning(task);
-					
-					if (totalDuration > 0 || task.targetTime) {
-						const spentText = totalDuration > 0 ? formatTimerDuration(totalDuration) : "0";
-						const targetDuration = parseTargetTime(task.targetTime);
-						const targetText = targetDuration > 0 ? formatTimerDurationNoSeconds(targetDuration) : "—";
-						timeDisplay.setText(`${spentText} / ${targetText}`);
-						timeDisplay.removeClass("empty");
-					} else {
-						timeDisplay.setText("—");
-						timeDisplay.addClass("empty");
-					}
-					
-					// Update button states and row visual state
-					if (isRunning) {
-						startButton.disabled = true;
-						stopButton.disabled = false;
-						startButton.addClass("disabled");
-						stopButton.removeClass("disabled");
-						timeSpentCell.addClass("running");
-						actionsCell.addClass("running");
-						row.addClass("timer-running");
-					} else {
-						startButton.disabled = false;
-						stopButton.disabled = true;
-						startButton.removeClass("disabled");
-						stopButton.addClass("disabled");
-						timeSpentCell.removeClass("running");
-						actionsCell.removeClass("running");
-						row.removeClass("timer-running");
-					}
-				}
+			
+			// Update target time
+			if (task.targetTime) {
+				const targetDuration = parseTargetTime(task.targetTime);
+				const targetText = targetDuration > 0 ? formatTimerDurationNoSeconds(targetDuration) : "—";
+				targetTimeDisplay.setText(targetText);
+				targetTimeDisplay.removeClass("empty");
+			} else {
+				targetTimeDisplay.setText("—");
+				targetTimeDisplay.addClass("empty");
+			}
+			
+			// Update button states and row visual state
+			if (isRunning) {
+				startButton.disabled = true;
+				stopButton.disabled = false;
+				startButton.addClass("disabled");
+				stopButton.removeClass("disabled");
+				timeSpentCell.addClass("running");
+				targetTimeCell.addClass("running");
+				actionsCell.addClass("running");
+				row.addClass("timer-running");
+			} else {
+				startButton.disabled = false;
+				stopButton.disabled = true;
+				startButton.removeClass("disabled");
+				stopButton.addClass("disabled");
+				timeSpentCell.removeClass("running");
+				targetTimeCell.removeClass("running");
+				actionsCell.removeClass("running");
+				row.removeClass("timer-running");
+			}
+		}
 			
 			// Progress bar cell
 			const progressCell = row.createEl("td", { cls: "kanban-table-cell-progress" });
@@ -2467,19 +2491,21 @@ export function renderKanban(
 		const updateSortButtons = () => {
 			const metadata = getColumnMetadata();
 			
-			// Update field button
-			const fieldIcons: Record<SortField, string> = {
-				"updateDateTime": "🔄",
-				"dueDate": "📅",
-				"title": "📝",
-				"timeSpent": "⏱️"
-			};
-			const fieldLabels: Record<SortField, string> = {
-				"updateDateTime": "Update",
-				"dueDate": "Due",
-				"title": "Title",
-				"timeSpent": "Time"
-			};
+		// Update field button
+		const fieldIcons: Record<SortField, string> = {
+			"updateDateTime": "🔄",
+			"dueDate": "📅",
+			"title": "📝",
+			"timeSpent": "⏱️",
+			"targetTime": "🎯"
+		};
+		const fieldLabels: Record<SortField, string> = {
+			"updateDateTime": "Update",
+			"dueDate": "Due",
+			"title": "Title",
+			"timeSpent": "Time",
+			"targetTime": "Target"
+		};
 			
 			// Show manual sort indicator or regular sort field
 			if (metadata.manualSort) {
@@ -2665,6 +2691,11 @@ export function renderKanban(
 						const aTime = getTaskTimerDuration(a);
 						const bTime = getTaskTimerDuration(b);
 						comparison = aTime - bTime;
+						break;
+					case "targetTime":
+						const aTarget = parseTargetTime(a.targetTime);
+						const bTarget = parseTargetTime(b.targetTime);
+						comparison = aTarget - bTarget;
 						break;
 				}
 				

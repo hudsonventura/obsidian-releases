@@ -28,14 +28,15 @@ The table displays the following columns for each task:
 2. **Tags** - Assignee or categorization tags
 3. **Due Date** - When the task is due (with visual indicators for overdue/soon)
 4. **Last Updated** - When the task was last modified
-5. **Time Spent** - Time tracked displayed as "spent / target" (shows target time if set)
-6. **Progress** - Visual progress bar showing completion percentage (when target time is set)
-7. **Actions** - Timer control buttons (play/stop)
+5. **Time Spent** - Total time tracked for the task (sortable)
+6. **Target Time** - Configured target/estimate time for the task (sortable)
+7. **Progress** - Visual progress bar showing completion percentage (when target time is set)
+8. **Actions** - Timer control buttons (play/stop)
 
 #### Sorting
 
 - Click any column header to sort tasks within that status section
-- Sortable columns: Name, Due Date, Time Spent, Last Updated
+- Sortable columns: Name, Due Date, Last Updated, Time Spent, Target Time
 - Toggle between ascending/descending order
 - Each status section maintains its own sort preferences
 
@@ -156,7 +157,8 @@ The columns provide comprehensive task information:
 - Tags (serves as "Assignee" field)
 - Due Date (deadline tracking)
 - Last Updated (activity tracking)
-- Time Spent (displays as "spent / target" for easy progress comparison)
+- Time Spent (total time tracked, sortable)
+- Target Time (target/estimate time, sortable)
 - Progress (visual progress bar with percentage when target time is set)
 - Actions (timer control buttons for starting/stopping time tracking)
 

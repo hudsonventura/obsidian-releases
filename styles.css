@@ -1703,7 +1703,8 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	font-weight: 600;
 }
 
-.kanban-table-cell-time-spent {
+.kanban-table-cell-time-spent,
+.kanban-table-cell-target-time {
 	font-family: var(--font-monospace);
 	font-size: 0.65rem;
 	white-space: nowrap;
@@ -1723,6 +1724,14 @@ body.kanban-drag-active .kanban-column-drag-over .kanban-column-tasks {
 	color: var(--interactive-accent);
 	font-weight: 600;
 	animation: timer-blink 2s ease-in-out infinite;
+}
+
+.kanban-table-cell-target-time {
+	color: var(--text-muted);
+}
+
+.kanban-table-cell-target-time.running {
+	opacity: 0.8;
 }
 
 .kanban-table-cell-actions {

@@ -2,7 +2,7 @@ export type KanbanStatus = string; // Allows custom statuses in addition to defa
 
 export type ColumnState = "todo" | "in-progress" | "done";
 
-export type SortField = "updateDateTime" | "dueDate" | "title" | "timeSpent";
+export type SortField = "updateDateTime" | "dueDate" | "title" | "timeSpent" | "targetTime";
 export type SortOrder = "asc" | "desc";
 
 export interface ColumnMetadata {
