@@ -74,6 +74,15 @@ function formatTimerDurationNoSeconds(milliseconds: number): string {
 	}
 }
 
+// Calculate total time spent for tasks in a specific status
+function calculateStatusTotalTime(tasks: KanbanTask[]): number {
+	let total = 0;
+	for (const task of tasks) {
+		total += getTaskTimerDuration(task);
+	}
+	return total;
+}
+
 function parseTargetTime(targetTime: string | undefined): number {
 	if (!targetTime) return 0;
 
@@ -1661,12 +1670,23 @@ export function renderKanban(
 			};
 			updateSectionTitle();
 			
-			const taskCount = sectionHeader.createEl("span", {
-				cls: "kanban-table-task-count",
-				text: `${tasks.length}`
-			});
-			
-			// Drag handlers for column reordering
+		const taskCount = sectionHeader.createEl("span", {
+			cls: "kanban-table-task-count",
+			text: `${tasks.length}`
+		});
+		
+		// Total time spent for this status
+		const totalTime = calculateStatusTotalTime(tasks);
+		const timeSpent = sectionHeader.createEl("span", {
+			cls: "kanban-status-time-spent"
+		});
+		if (totalTime > 0) {
+			timeSpent.setText(`⏱ ${formatTimerDurationNoSeconds(totalTime)}`);
+		} else {
+			timeSpent.setText('');
+		}
+		
+		// Drag handlers for column reordering
 			sectionHeader.addEventListener("dragstart", (e: DragEvent) => {
 				if (!e.dataTransfer) return;
 				e.stopPropagation(); // Prevent task drag from triggering
@@ -3395,6 +3415,11 @@ export function renderKanban(
 			cls: "kanban-column-count"
 		});
 		
+		// Time spent badge
+		const timeSpentBadge = headerEl.createEl("span", {
+			cls: "kanban-status-time-spent"
+		});
+		
 		// Sort buttons container
 		const sortButtonsContainer = headerEl.createDiv("kanban-sort-buttons");
 		
@@ -3734,10 +3759,18 @@ export function renderKanban(
 		const collapsedColumns = data.collapsedColumns || [];
 		let isCollapsed = collapsedColumns.includes(status);
 		
-		// Function to update task count
+		// Function to update task count and time spent
 		const updateTaskCount = () => {
 			const tasks = tasksByStatus.get(status) || [];
 			taskCountBadge.setText(`${tasks.length}`);
+			
+			// Update time spent
+			const totalTime = calculateStatusTotalTime(tasks);
+			if (totalTime > 0) {
+				timeSpentBadge.setText(`⏱ ${formatTimerDurationNoSeconds(totalTime)}`);
+			} else {
+				timeSpentBadge.setText('');
+			}
 		};
 		
 		// Set initial count
