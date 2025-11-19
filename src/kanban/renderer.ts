@@ -346,8 +346,8 @@ export function renderKanban(
 		cls: "kanban-filter-input",
 		attr: {
 			type: "text",
-			placeholder: "Filter tasks...",
-			"aria-label": "Filter tasks"
+			placeholder: "Filter by task name or tags...",
+			"aria-label": "Filter tasks by name or tags"
 		}
 	});
 	
@@ -369,8 +369,9 @@ export function renderKanban(
 		allTaskElements.forEach((taskEl) => {
 			const taskElement = taskEl as HTMLElement;
 			const taskTitle = taskElement.getAttribute("data-task-title")?.toLowerCase() || "";
+			const taskTags = taskElement.getAttribute("data-task-tags")?.toLowerCase() || "";
 			
-			if (filterText === "" || taskTitle.includes(filterText)) {
+			if (filterText === "" || taskTitle.includes(filterText) || taskTags.includes(filterText)) {
 				taskElement.style.display = "";
 			} else {
 				taskElement.style.display = "none";
@@ -403,6 +404,7 @@ export function renderKanban(
 		taskEl.setAttr("draggable", "true");
 		taskEl.setAttr("data-task", task.task);
 		taskEl.setAttr("data-task-title", task.task); // For filtering
+		taskEl.setAttr("data-task-tags", task.tags ? task.tags.join(",").toLowerCase() : ""); // For filtering by tags
 		taskEl.setAttr("data-status", status);
 		taskEl.classList.add("kanban-task-draggable");
 		
@@ -917,6 +919,9 @@ export function renderKanban(
 					tagEl.setText(tag);
 				});
 			}
+			
+			// Update data attribute for filtering
+			taskEl.setAttr("data-task-tags", task.tags ? task.tags.join(",").toLowerCase() : "");
 		}
 		
 		// Initial tags display
@@ -2229,6 +2234,7 @@ export function renderKanban(
 				row.setAttr("draggable", "true");
 				row.setAttr("data-task", task.task);
 				row.setAttr("data-task-title", task.task); // For filtering
+				row.setAttr("data-task-tags", task.tags ? task.tags.join(",").toLowerCase() : ""); // For filtering by tags
 				row.setAttr("data-status", status);
 				
 				// Add running class if timer is active
