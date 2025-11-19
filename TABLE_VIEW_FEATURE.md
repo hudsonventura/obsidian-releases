@@ -54,7 +54,11 @@ The table displays the following columns for each task:
 - Filter is case-insensitive and searches within task titles
 - Tasks that don't match are hidden automatically
 - Clear the filter to show all tasks again
-- Filter persists while navigating between views
+- **Filter persists** across:
+  - View changes (horizontal ↔ vertical ↔ table)
+  - Status changes and task updates
+  - File saves and reloads
+  - All task operations (drag-and-drop, editing, etc.)
 
 #### Visual Indicators
 
@@ -83,10 +87,25 @@ The table displays the following columns for each task:
 
 ### Interacting with Tasks
 
+#### Inline Editing
+
+- **Double-click task title** (Table view only): Edit the task name directly in the table
+  - Double-click on any task title to enter edit mode
+  - Press `Enter` to save changes
+  - Press `Escape` to cancel
+  - Click away (blur) to auto-save
+  - Drag-and-drop is disabled while editing
+  - Tags are preserved when editing task names
+
 #### Context Menu (Right-click)
+
+All views (Horizontal, Vertical, and Table) now share a unified context menu with the following options:
+
+- **Edit Timer Entries**: View and edit all timer entries for a task
 - **Edit Tags**: Modify task tags/assignees
-- **Edit Due Date**: Set or update task due dates
-- **Delete Task**: Remove the task
+- **Edit Due Date & Target Time**: Set or update both the task due date and target time in one dialog
+- **Duplicate Task**: Create a copy of the task (including timer entries, tags, and settings)
+- **Delete Task**: Remove the task (requires confirmation to prevent accidental deletion)
 
 #### Drag and Drop
 - Tasks remain draggable in table view

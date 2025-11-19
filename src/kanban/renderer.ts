@@ -1079,65 +1079,76 @@ export function renderKanban(
 					});
 			});
 			
-		// Edit Tags option
-		menu.addItem((item) => {
-			item
-				.setTitle("Edit Tags")
-				.setIcon("tag")
-				.onClick(() => {
-					const modal = new EditTagsModal(
-						plugin.app,
-						task.tags || [],
-						async (tagsArray) => {
-							if (tagsArray === null) return; // User cancelled
-							
-							// Update task tags
-							task.tags = tagsArray.length > 0 ? tagsArray : undefined;
-							
-							// Update display
-							updateTagsDisplay();
-							
-							// Save to file
-							await saveTasksToFile(task.task);
-							
-							console.log("Kanban: Tags updated for task:", task.task, "New tags:", task.tags);
+	// Edit Tags option
+	menu.addItem((item) => {
+		item
+			.setTitle("Edit Tags")
+			.setIcon("tag")
+			.onClick(() => {
+				const modal = new EditTagsModal(
+					plugin.app,
+					task.tags || [],
+					async (tagsArray) => {
+						if (tagsArray === null) return; // User cancelled
+						
+						// Update task tags
+						task.tags = tagsArray.length > 0 ? tagsArray : undefined;
+						
+						// Update display
+						updateTagsDisplay();
+						
+						// Save to file
+						await saveTasksToFile(task.task);
+						
+						console.log("Kanban: Tags updated for task:", task.task, "New tags:", task.tags);
+					}
+				);
+				modal.open();
+			});
+	});
+	
+	// Edit Due Date & Target Time option
+	menu.addItem((item) => {
+		item
+			.setTitle("Edit Due Date & Target Time")
+			.setIcon("calendar")
+			.onClick(() => {
+				const modal = new DueDateModal(
+					plugin.app,
+					task.dueDate,
+					task.targetTime,
+					async (newDate, newTargetTime) => {
+						// Update due date
+						if (newDate === null) {
+							task.dueDate = undefined;
+						} else {
+							task.dueDate = newDate;
 						}
-					);
-					modal.open();
-				});
-		});
-		
-		// Edit Target Time option
-		menu.addItem((item) => {
-			item
-				.setTitle("Edit Target Time")
-				.setIcon("target")
-				.onClick(() => {
-					const modal = new EditTargetTimeModal(
-						plugin.app,
-						task.targetTime,
-						async (newTargetTime) => {
-							if (newTargetTime === null) return; // User cancelled
-							
-							// Update task target time
-							if (newTargetTime === "") {
-								task.targetTime = undefined;
-							} else {
-								task.targetTime = newTargetTime;
-							}
-							
-							// Update the display
-							updateProgressBar();
-							
-							// Save to file
-							await saveTasksToFile(task.task);
-							
-							console.log("Kanban: Target time updated for task:", task.task, "New target:", task.targetTime);
+						
+						// Update target time
+						if (newTargetTime === null) {
+							// User cancelled, don't change target time
+						} else if (newTargetTime === "") {
+							// Clear target time
+							task.targetTime = undefined;
+						} else {
+							// Set new target time
+							task.targetTime = newTargetTime;
 						}
-					);
-					modal.open();
-				});
-		});
+						
+						// Update the displays
+						updateDueDateDisplay();
+						updateProgressBar();
+						
+						// Save to file
+						await saveTasksToFile(task.task);
+						
+						console.log("Kanban: Due date and target time updated for task:", task.task);
+					}
+				);
+				modal.open();
+			});
+	});
 		
 		// Duplicate and Delete options
 		menu.addSeparator();
@@ -1178,24 +1189,29 @@ export function renderKanban(
 				});
 		});
 		
-		// Delete Task option
-		menu.addItem((item) => {
-			item
-				.setTitle("Delete Task")
-				.setIcon("trash")
-				.onClick(async () => {
-					// Remove from taskElements
-					taskElements.delete(taskEl);
-					
-					// Remove from DOM
-					taskEl.remove();
-					
-					// Save to file
-					await saveTasksToFile();
-					
-					console.log("Kanban: Deleted task:", task.task);
-				});
-		});
+	// Delete Task option
+	menu.addItem((item) => {
+		item
+			.setTitle("Delete Task")
+			.setIcon("trash")
+			.onClick(async () => {
+				// Confirm before deleting
+				if (!confirm(`Are you sure you want to delete the task "${task.task}"?`)) {
+					return;
+				}
+				
+				// Remove from taskElements
+				taskElements.delete(taskEl);
+				
+				// Remove from DOM
+				taskEl.remove();
+				
+				// Save to file
+				await saveTasksToFile();
+				
+				console.log("Kanban: Deleted task:", task.task);
+			});
+	});
 			
 			menu.showAtMouseEvent(e);
 		});
@@ -1252,16 +1268,18 @@ export function renderKanban(
 			console.log("Kanban: Updated task:", updatedTaskText);
 		}
 		
-		await updateKanbanInFile(plugin.app, ctx, updatedTaskText || "", "todo" as KanbanStatus, originalSource, { 
-			tasks: allTasks, 
-			columns: data.columns,
-			columnMetadata: data.columnMetadata,
-			collapsedColumns: data.collapsedColumns,
-			view: data.view,
-			slimMode: data.slimMode
-		}).catch(err => {
-			console.error("Error saving tasks to file:", err);
-		});
+	await updateKanbanInFile(plugin.app, ctx, updatedTaskText || "", "todo" as KanbanStatus, originalSource, { 
+		tasks: allTasks, 
+		columns: data.columns,
+		columnMetadata: data.columnMetadata,
+		collapsedColumns: data.collapsedColumns,
+		view: data.view,
+		slimMode: data.slimMode,
+		columnWidths: data.columnWidths,
+		filterText: data.filterText
+	}).catch(err => {
+		console.error("Error saving tasks to file:", err);
+	});
 	}
 	
 	async function saveCollapsedState() {
@@ -1300,18 +1318,20 @@ export function renderKanban(
 			allTasks.push(taskData);
 		});
 		
-		console.log("Kanban: Saving collapsed state:", data.collapsedColumns);
-		console.log("Kanban: Saving column metadata:", data.columnMetadata);
-		
-		await updateKanbanInFile(plugin.app, ctx, "", "todo" as KanbanStatus, originalSource, { 
-			tasks: allTasks, 
-			columns: data.columns,
-			columnMetadata: data.columnMetadata,
-			collapsedColumns: data.collapsedColumns,
-			view: data.view,
-			slimMode: data.slimMode
-		}).catch(err => {
-			console.error("Error saving collapsed state to file:", err);
+	console.log("Kanban: Saving collapsed state:", data.collapsedColumns);
+	console.log("Kanban: Saving column metadata:", data.columnMetadata);
+	
+	await updateKanbanInFile(plugin.app, ctx, "", "todo" as KanbanStatus, originalSource, { 
+		tasks: allTasks, 
+		columns: data.columns,
+		columnMetadata: data.columnMetadata,
+		collapsedColumns: data.collapsedColumns,
+		view: data.view,
+		slimMode: data.slimMode,
+		columnWidths: data.columnWidths,
+		filterText: data.filterText
+	}).catch(err => {
+		console.error("Error saving collapsed state to file:", err);
 		});
 	}
 	
@@ -1351,18 +1371,20 @@ export function renderKanban(
 			allTasks.push(taskData);
 		});
 		
-		console.log("Kanban: Saving view preference:", data.view);
-		
-		await updateKanbanInFile(plugin.app, ctx, "", "todo" as KanbanStatus, originalSource, { 
-			tasks: allTasks, 
-			columns: data.columns,
-			columnMetadata: data.columnMetadata,
-			collapsedColumns: data.collapsedColumns,
-			view: data.view,
-			slimMode: data.slimMode
-		}).catch(err => {
-			console.error("Error saving view preference to file:", err);
-		});
+	console.log("Kanban: Saving view preference:", data.view);
+	
+	await updateKanbanInFile(plugin.app, ctx, "", "todo" as KanbanStatus, originalSource, { 
+		tasks: allTasks, 
+		columns: data.columns,
+		columnMetadata: data.columnMetadata,
+		collapsedColumns: data.collapsedColumns,
+		view: data.view,
+		slimMode: data.slimMode,
+		columnWidths: data.columnWidths,
+		filterText: data.filterText
+	}).catch(err => {
+		console.error("Error saving view preference to file:", err);
+	});
 	}
 	
 	async function saveSlimModePreference() {
@@ -1401,18 +1423,20 @@ export function renderKanban(
 			allTasks.push(taskData);
 		});
 		
-		console.log("Kanban: Saving slim mode preference:", data.slimMode);
-		
-		await updateKanbanInFile(plugin.app, ctx, "", "todo" as KanbanStatus, originalSource, { 
-			tasks: allTasks, 
-			columns: data.columns,
-			columnMetadata: data.columnMetadata,
-			collapsedColumns: data.collapsedColumns,
-			view: data.view,
-			slimMode: data.slimMode
-		}).catch(err => {
-			console.error("Error saving slim mode preference to file:", err);
-		});
+	console.log("Kanban: Saving slim mode preference:", data.slimMode);
+	
+	await updateKanbanInFile(plugin.app, ctx, "", "todo" as KanbanStatus, originalSource, { 
+		tasks: allTasks, 
+		columns: data.columns,
+		columnMetadata: data.columnMetadata,
+		collapsedColumns: data.collapsedColumns,
+		view: data.view,
+		slimMode: data.slimMode,
+		columnWidths: data.columnWidths,
+		filterText: data.filterText
+	}).catch(err => {
+		console.error("Error saving slim mode preference to file:", err);
+	});
 	}
 	
 	// Add status button handler - opens modal
@@ -2317,15 +2341,157 @@ export function renderKanban(
 					menu.showAtMouseEvent(e);
 				});
 				
-				// Task name content
-				const taskNameContent = nameCell.createDiv("kanban-table-task-content");
-				MarkdownRenderer.render(
-					plugin.app,
-					task.task,
-					taskNameContent,
-					ctx.sourcePath,
-					component
-				).then(() => {
+			// Task name content
+			const taskNameContent = nameCell.createDiv("kanban-table-task-content");
+			MarkdownRenderer.render(
+				plugin.app,
+				task.task,
+				taskNameContent,
+				ctx.sourcePath,
+				component
+			).then(() => {
+				const paragraph = taskNameContent.querySelector("p");
+				if (paragraph) {
+					while (paragraph.firstChild) {
+						taskNameContent.appendChild(paragraph.firstChild);
+					}
+					paragraph.remove();
+				}
+				
+				// Add tags inline after the task name
+				if (task.tags && task.tags.length > 0) {
+					task.tags.forEach(tag => {
+						const tagEl = taskNameContent.createSpan("kanban-tag");
+						tagEl.setText(tag);
+					});
+				}
+			});
+			
+			// Double-click to edit task title
+			let isEditingTaskName = false;
+			taskNameContent.addEventListener("dblclick", (e) => {
+				e.stopPropagation();
+				
+				if (isEditingTaskName) return;
+				isEditingTaskName = true;
+				
+				const oldTaskText = task.task;
+				
+				// Save current tags before editing
+				const tagsToPreserve = task.tags ? [...task.tags] : [];
+				
+				// Create input element
+				const input = taskNameContent.createEl("input", {
+					type: "text",
+					cls: "kanban-task-edit-input",
+					value: oldTaskText
+				});
+				
+				// Clear content and add input
+				taskNameContent.empty();
+				taskNameContent.appendChild(input);
+				input.focus();
+				input.select();
+				
+				// Disable dragging while editing
+				row.setAttr("draggable", "false");
+				row.classList.remove("kanban-task-draggable");
+				
+				const saveEdit = async () => {
+					if (!isEditingTaskName) return;
+					
+					const newTaskText = input.value.trim();
+					
+					// Clear and restore
+					taskNameContent.empty();
+					
+					if (newTaskText && newTaskText !== oldTaskText) {
+						// Update task
+						task.task = newTaskText;
+						task.updateDateTime = moment().toISOString();
+						
+						// Update data-task attributes
+						row.setAttr("data-task", newTaskText);
+						row.setAttr("data-task-title", newTaskText);
+						
+						// Re-render the markdown
+						await MarkdownRenderer.render(
+							plugin.app,
+							task.task,
+							taskNameContent,
+							ctx.sourcePath,
+							component
+						);
+						
+						const paragraph = taskNameContent.querySelector("p");
+						if (paragraph) {
+							while (paragraph.firstChild) {
+								taskNameContent.appendChild(paragraph.firstChild);
+							}
+							paragraph.remove();
+						}
+						
+						// Restore tags
+						task.tags = tagsToPreserve.length > 0 ? tagsToPreserve : undefined;
+						if (task.tags && task.tags.length > 0) {
+							task.tags.forEach(tag => {
+								const tagEl = taskNameContent.createSpan("kanban-tag");
+								tagEl.setText(tag);
+							});
+						}
+						
+						// Save to file
+						await saveTasksToFile(oldTaskText);
+						
+						console.log("Kanban: Updated task name from", oldTaskText, "to", newTaskText);
+					} else {
+						// Restore original content
+						await MarkdownRenderer.render(
+							plugin.app,
+							oldTaskText,
+							taskNameContent,
+							ctx.sourcePath,
+							component
+						);
+						
+						const paragraph = taskNameContent.querySelector("p");
+						if (paragraph) {
+							while (paragraph.firstChild) {
+								taskNameContent.appendChild(paragraph.firstChild);
+							}
+							paragraph.remove();
+						}
+						
+						// Restore tags
+						if (tagsToPreserve.length > 0) {
+							tagsToPreserve.forEach(tag => {
+								const tagEl = taskNameContent.createSpan("kanban-tag");
+								tagEl.setText(tag);
+							});
+						}
+					}
+					
+					// Re-enable dragging
+					row.setAttr("draggable", "true");
+					row.classList.add("kanban-task-draggable");
+					
+					isEditingTaskName = false;
+				};
+				
+				const cancelEdit = async () => {
+					if (!isEditingTaskName) return;
+					
+					// Clear and restore original content
+					taskNameContent.empty();
+					
+					await MarkdownRenderer.render(
+						plugin.app,
+						oldTaskText,
+						taskNameContent,
+						ctx.sourcePath,
+						component
+					);
+					
 					const paragraph = taskNameContent.querySelector("p");
 					if (paragraph) {
 						while (paragraph.firstChild) {
@@ -2334,14 +2500,40 @@ export function renderKanban(
 						paragraph.remove();
 					}
 					
-					// Add tags inline after the task name
-					if (task.tags && task.tags.length > 0) {
-						task.tags.forEach(tag => {
+					// Restore tags
+					if (tagsToPreserve.length > 0) {
+						tagsToPreserve.forEach(tag => {
 							const tagEl = taskNameContent.createSpan("kanban-tag");
 							tagEl.setText(tag);
 						});
 					}
+					
+					// Re-enable dragging
+					row.setAttr("draggable", "true");
+					row.classList.add("kanban-task-draggable");
+					
+					isEditingTaskName = false;
+				};
+				
+				input.addEventListener("keydown", async (event) => {
+					if (event.key === "Enter") {
+						event.preventDefault();
+						await saveEdit();
+					} else if (event.key === "Escape") {
+						event.preventDefault();
+						await cancelEdit();
+					}
 				});
+				
+				input.addEventListener("blur", async () => {
+					// Use setTimeout to allow other events to process first
+					setTimeout(async () => {
+						if (isEditingTaskName) {
+							await saveEdit();
+						}
+					}, 100);
+				});
+			});
 				
 		// Due date cell
 		const dueDateCell = row.createEl("td", { cls: "kanban-table-cell-due-date" });
@@ -2428,40 +2620,46 @@ export function renderKanban(
 		}
 		const timeSpentDisplay = timeSpentCell.createSpan("kanban-table-time-display");
 		
-		// Target time cell
-		const targetTimeCell = row.createEl("td", { cls: "kanban-table-cell-target-time" });
-		if (data.columnWidths?.targetTime) {
-			targetTimeCell.style.width = data.columnWidths.targetTime + "px";
-		}
-		const targetTimeDisplay = targetTimeCell.createSpan("kanban-table-time-display");
+	// Target time cell
+	const targetTimeCell = row.createEl("td", { cls: "kanban-table-cell-target-time" });
+	if (data.columnWidths?.targetTime) {
+		targetTimeCell.style.width = data.columnWidths.targetTime + "px";
+	}
+	const targetTimeDisplay = targetTimeCell.createSpan("kanban-table-time-display");
+	
+	// Declare button and cell variables that will be defined later
+	let startButton: HTMLButtonElement;
+	let stopButton: HTMLButtonElement;
+	let actionsCell: HTMLElement;
+	
+	// Function to update timer display
+	const updateTimerDisplay = () => {
+		const totalDuration = getTaskTimerDuration(task);
+		const isRunning = isTaskTimerRunning(task);
 		
-		// Function to update timer display
-		const updateTimerDisplay = () => {
-			const totalDuration = getTaskTimerDuration(task);
-			const isRunning = isTaskTimerRunning(task);
-			
-			// Update spent time
-			if (totalDuration > 0) {
-				timeSpentDisplay.setText(formatTimerDuration(totalDuration));
-				timeSpentDisplay.removeClass("empty");
-			} else {
-				timeSpentDisplay.setText("—");
-				timeSpentDisplay.addClass("empty");
-			}
+		// Update spent time
+		if (totalDuration > 0) {
+			timeSpentDisplay.setText(formatTimerDuration(totalDuration));
+			timeSpentDisplay.removeClass("empty");
+		} else {
+			timeSpentDisplay.setText("—");
+			timeSpentDisplay.addClass("empty");
+		}
 
-			
-			// Update target time
-			if (task.targetTime) {
-				const targetDuration = parseTargetTime(task.targetTime);
-				const targetText = targetDuration > 0 ? formatTimerDurationNoSeconds(targetDuration) : "—";
-				targetTimeDisplay.setText(targetText);
-				targetTimeDisplay.removeClass("empty");
-			} else {
-				targetTimeDisplay.setText("—");
-				targetTimeDisplay.addClass("empty");
-			}
-			
-			// Update button states and row visual state
+		
+		// Update target time
+		if (task.targetTime) {
+			const targetDuration = parseTargetTime(task.targetTime);
+			const targetText = targetDuration > 0 ? formatTimerDurationNoSeconds(targetDuration) : "—";
+			targetTimeDisplay.setText(targetText);
+			targetTimeDisplay.removeClass("empty");
+		} else {
+			targetTimeDisplay.setText("—");
+			targetTimeDisplay.addClass("empty");
+		}
+		
+		// Update button states and row visual state (only if buttons exist)
+		if (startButton && stopButton && actionsCell) {
 			if (isRunning) {
 				startButton.disabled = true;
 				stopButton.disabled = false;
@@ -2482,6 +2680,7 @@ export function renderKanban(
 				row.removeClass("timer-running");
 			}
 		}
+	}
 
 			
 			// Progress bar cell
@@ -2621,73 +2820,138 @@ export function renderKanban(
 					await saveTasksToFile(task.task);
 				});
 				
-				// Row context menu
-				row.addEventListener("contextmenu", (e) => {
-					e.preventDefault();
-					const menu = new Menu();
-					
-					menu.addItem((item) => {
-						item.setTitle("Edit Tags").setIcon("tag").onClick(() => {
-							const modal = new EditTagsModal(
-								plugin.app,
-								task.tags || [],
-								async (tagsArray) => {
-								if (tagsArray === null) return;
-								task.tags = tagsArray.length > 0 ? tagsArray : undefined;
+			// Row context menu
+			row.addEventListener("contextmenu", (e) => {
+				e.preventDefault();
+				const menu = new Menu();
+				
+				// Edit Timer Entries option
+				menu.addItem((item) => {
+					item.setTitle("Edit Timer Entries").setIcon("clock").onClick(() => {
+						const modal = new TimerEntriesModal(
+							plugin.app,
+							task.task,
+							task.timerEntries || [],
+							async (updatedEntries) => {
+								// Update task with new entries
+								task.timerEntries = updatedEntries.length > 0 ? updatedEntries : undefined;
+								
+								// Re-render to update display
+								renderTableView();
+								setTimeout(() => applyFilter(), 0);
+								
+								// Save to file
+								await saveTasksToFile(task.task);
+								
+								console.log("Kanban: Timer entries updated for task:", task.task);
+							}
+						);
+						modal.open();
+					});
+				});
+				
+				// Edit Tags option
+				menu.addItem((item) => {
+					item.setTitle("Edit Tags").setIcon("tag").onClick(() => {
+						const modal = new EditTagsModal(
+							plugin.app,
+							task.tags || [],
+							async (tagsArray) => {
+							if (tagsArray === null) return;
+							task.tags = tagsArray.length > 0 ? tagsArray : undefined;
+							renderTableView();
+							setTimeout(() => applyFilter(), 0);
+							await saveTasksToFile(task.task);
+							}
+						);
+						modal.open();
+					});
+				});
+				
+				// Edit Due Date & Target Time option
+				menu.addItem((item) => {
+					item.setTitle("Edit Due Date & Target Time").setIcon("calendar").onClick(() => {
+						const modal = new DueDateModal(
+							plugin.app,
+							task.dueDate,
+							task.targetTime,
+							async (newDate, newTargetTime) => {
+								if (newDate === null) {
+									task.dueDate = undefined;
+								} else {
+									task.dueDate = newDate;
+								}
+								
+								// Update target time
+								if (newTargetTime === null) {
+									// User cancelled, don't change target time
+								} else if (newTargetTime === "") {
+									// Clear target time
+									task.targetTime = undefined;
+								} else {
+									// Set new target time
+									task.targetTime = newTargetTime;
+								}
+								
 								renderTableView();
 								setTimeout(() => applyFilter(), 0);
 								await saveTasksToFile(task.task);
-								}
-							);
-							modal.open();
-						});
+							}
+						);
+						modal.open();
 					});
-					
-					menu.addItem((item) => {
-						item.setTitle("Edit Due Date & Target Time").setIcon("calendar").onClick(() => {
-							const modal = new DueDateModal(
-								plugin.app,
-								task.dueDate,
-								task.targetTime,
-								async (newDate, newTargetTime) => {
-									if (newDate === null) {
-										task.dueDate = undefined;
-									} else {
-										task.dueDate = newDate;
-									}
-									
-									// Update target time
-									if (newTargetTime === null) {
-										// User cancelled, don't change target time
-									} else if (newTargetTime === "") {
-										// Clear target time
-										task.targetTime = undefined;
-									} else {
-										// Set new target time
-										task.targetTime = newTargetTime;
-									}
-									
-									renderTableView();
-									setTimeout(() => applyFilter(), 0);
-									await saveTasksToFile(task.task);
-								}
-							);
-							modal.open();
-						});
-					});
-					
-					menu.addSeparator();
-					
-					menu.addItem((item) => {
-						item.setTitle("Delete Task").setIcon("trash").onClick(async () => {
-							taskElements.delete(row);
-							row.remove();
-							await saveTasksToFile();
-						});
-					});
-					
-					menu.showAtMouseEvent(e);
 				});
+				
+				menu.addSeparator();
+				
+			// Duplicate Task option
+			menu.addItem((item) => {
+				item.setTitle("Duplicate Task").setIcon("copy").onClick(async () => {
+					// Create a deep copy of the task
+					const duplicatedTask: KanbanTask = {
+						task: task.task,
+						status: status,
+						targetTime: task.targetTime,
+						tags: task.tags ? [...task.tags] : undefined,
+						timerEntries: task.timerEntries ? task.timerEntries.map(entry => ({ ...entry })) : undefined,
+						dueDate: task.dueDate,
+						updateDateTime: moment().toISOString() // Set current time for the duplicate
+					};
+					
+					// Add to tasksByStatus (this will be picked up when re-rendering)
+					const statusTasks = tasksByStatus.get(status) || [];
+					statusTasks.push(duplicatedTask);
+					tasksByStatus.set(status, statusTasks);
+					
+					// Re-render to show the new task
+					renderTableView();
+					setTimeout(() => applyFilter(), 0);
+					
+					// Save to file
+					await saveTasksToFile();
+					
+					console.log("Kanban: Duplicated task:", task.task);
+				});
+			});
+				
+			// Delete Task option
+			menu.addItem((item) => {
+				item.setTitle("Delete Task").setIcon("trash").onClick(async () => {
+					// Confirm before deleting
+					if (!confirm(`Are you sure you want to delete the task "${task.task}"?`)) {
+						return;
+					}
+					
+					taskElements.delete(row);
+					row.remove();
+					await saveTasksToFile();
+					
+					console.log("Kanban: Deleted task:", task.task);
+				});
+			});
+				
+				menu.showAtMouseEvent(e);
+			});
 			});
 			
 			// Collapse functionality
